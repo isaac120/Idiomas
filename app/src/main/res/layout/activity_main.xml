@@ -35,6 +35,56 @@
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="8dp" />
 
+    <!-- Streak Badge -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/streakCard"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="4dp"
+        app:cardBackgroundColor="@color/white"
+        app:layout_constraintTop_toBottomOf="@id/subtitleText"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="20dp"
+            android:paddingVertical="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔥"
+                android:textSize="24sp" />
+
+            <TextView
+                android:id="@+id/streakCount"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:textColor="@color/text_primary"
+                android:layout_marginStart="8dp" />
+
+            <TextView
+                android:id="@+id/streakLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="días de racha"
+                android:textSize="14sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginStart="8dp" />
+
+        </LinearLayout>
+
+    </androidx.cardview.widget.CardView>
+
     <!-- My Lists Button -->
     <Button
         android:id="@+id/myListsButton"
@@ -44,7 +94,7 @@
         android:textColor="@color/primary_blue"
         android:backgroundTint="@color/white"
         android:textAllCaps="false"
-        app:layout_constraintTop_toBottomOf="@id/subtitleText"
+        app:layout_constraintTop_toBottomOf="@id/streakCard"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="16dp" />

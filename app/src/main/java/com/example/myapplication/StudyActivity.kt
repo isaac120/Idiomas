@@ -18,6 +18,7 @@ import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.example.myapplication.data.StreakManager
 import com.example.myapplication.model.WordPair
 import java.util.Locale
 
@@ -61,6 +62,9 @@ class StudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var correctCount = 0
     private var totalWords = 0
     private var currentIndex = 0
+
+    // Streak
+    private val streakManager by lazy { StreakManager(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -330,6 +334,16 @@ class StudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private fun showSessionComplete() {
         completeOverlay.visibility = View.VISIBLE
         finalScoreText.text = "Completaste $correctCount de $totalWords palabras"
+        
+        // Record practice for streak
+        val newStreak = streakManager.recordPractice()
+        if (newStreak > 0) {
+            android.widget.Toast.makeText(
+                this,
+                "🔥 Racha: $newStreak días",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
     }
 
     override fun onDestroy() {

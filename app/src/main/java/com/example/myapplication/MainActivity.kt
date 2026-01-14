@@ -16,6 +16,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.myapplication.data.AppDatabase
+import com.example.myapplication.data.StreakManager
 import com.example.myapplication.model.WordPair
 import com.example.myapplication.util.FileParser
 import kotlinx.coroutines.Dispatchers
@@ -30,10 +31,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var saveListButton: Button
     private lateinit var wordsCountText: TextView
     private lateinit var uploadCard: CardView
+    private lateinit var streakCount: TextView
+    private lateinit var streakLabel: TextView
 
     private var loadedWords: List<WordPair> = emptyList()
     
     private val database by lazy { AppDatabase.getDatabase(this) }
+    private val streakManager by lazy { StreakManager(this) }
 
     // File picker launcher
     private val filePickerLauncher = registerForActivityResult(
@@ -76,6 +80,11 @@ class MainActivity : AppCompatActivity() {
         setupListeners()
     }
 
+    override fun onResume() {
+        super.onResume()
+        updateStreakDisplay()
+    }
+
     private fun initViews() {
         selectFileButton = findViewById(R.id.selectFileButton)
         startButton = findViewById(R.id.startButton)
@@ -83,6 +92,19 @@ class MainActivity : AppCompatActivity() {
         saveListButton = findViewById(R.id.saveListButton)
         wordsCountText = findViewById(R.id.wordsCountText)
         uploadCard = findViewById(R.id.uploadCard)
+        streakCount = findViewById(R.id.streakCount)
+        streakLabel = findViewById(R.id.streakLabel)
+    }
+
+    private fun updateStreakDisplay() {
+        val streak = streakManager.getStreak()
+        streakCount.text = streak.toString()
+        
+        streakLabel.text = when {
+            streak == 0 -> "¡Empieza tu racha!"
+            streak == 1 -> "día de racha"
+            else -> "días de racha"
+        }
     }
 
     private fun setupListeners() {
