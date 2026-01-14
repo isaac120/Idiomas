@@ -32,6 +32,10 @@
             android:name=".EditListActivity"
             android:exported="false"
             android:parentActivityName=".MyListsActivity" />
+        <activity
+            android:name=".StatsActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
     </application>
 
 </manifest>

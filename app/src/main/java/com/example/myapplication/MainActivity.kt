@@ -147,6 +147,10 @@ class MainActivity : AppCompatActivity() {
             showSaveListDialog()
         }
 
+        findViewById<Button>(R.id.statsButton).setOnClickListener {
+            startActivity(Intent(this, StatsActivity::class.java))
+        }
+
         darkModeSwitch.setOnCheckedChangeListener { _, isChecked ->
             toggleDarkMode(isChecked)
         }

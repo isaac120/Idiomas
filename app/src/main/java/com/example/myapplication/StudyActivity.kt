@@ -18,8 +18,14 @@ import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.example.myapplication.data.AppDatabase
+import com.example.myapplication.data.PracticeSession
 import com.example.myapplication.data.StreakManager
+import com.example.myapplication.data.WordStats
 import com.example.myapplication.model.WordPair
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 class StudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
@@ -65,6 +71,11 @@ class StudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     // Streak
     private val streakManager by lazy { StreakManager(this) }
+    
+    // Database
+    private val database by lazy { AppDatabase.getDatabase(this) }
+    private val failedWords = mutableSetOf<String>()
+    private val correctWords = mutableSetOf<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -284,11 +295,13 @@ class StudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 pendingWords.remove(word)
                 correctCount++
                 scoreText.text = "✓ $correctCount"
+                correctWords.add(word.getExpectedAnswer())
             } else {
                 // Word stays in the list for retry
                 // Optionally move to end of list
                 pendingWords.remove(word)
                 pendingWords.add(word)
+                failedWords.add(word.getExpectedAnswer())
             }
 
             updateProgress()
@@ -343,6 +356,43 @@ class StudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 "🔥 Racha: $newStreak días",
                 android.widget.Toast.LENGTH_SHORT
             ).show()
+        }
+        
+        // Save session to database
+        saveSessionStats()
+    }
+
+    private fun saveSessionStats() {
+        CoroutineScope(Dispatchers.IO).launch {
+            val statsDao = database.statsDao()
+            
+            // Save session
+            statsDao.insertSession(
+                PracticeSession(
+                    correctCount = correctCount,
+                    totalCount = totalWords
+                )
+            )
+            
+            // Update word stats for failed words
+            failedWords.forEach { word ->
+                val existing = statsDao.getWordStats(word)
+                if (existing != null) {
+                    statsDao.incrementIncorrect(word)
+                } else {
+                    statsDao.insertWordStats(WordStats(word = word, incorrectCount = 1))
+                }
+            }
+            
+            // Update word stats for correct words
+            correctWords.forEach { word ->
+                val existing = statsDao.getWordStats(word)
+                if (existing != null) {
+                    statsDao.incrementCorrect(word)
+                } else {
+                    statsDao.insertWordStats(WordStats(word = word, correctCount = 1))
+                }
+            }
         }
     }
 
