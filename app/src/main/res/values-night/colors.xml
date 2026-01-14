@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    
+    <!-- Feedback colors (same for dark) -->
+    <color name="success_green">#FF4CAF50</color>
+    <color name="success_green_light">#FF1B3D20</color>
+    <color name="error_red">#FFF44336</color>
+    <color name="error_red_light">#FF3D1B1B</color>
+    
+    <!-- UI Theme colors - DARK -->
+    <color name="primary_blue">#FF818CF8</color>
+    <color name="primary_blue_dark">#FF6366F1</color>
+    <color name="card_background">#FF1E293B</color>
+    <color name="background_light">#FF0F172A</color>
+    <color name="text_primary">#FFF1F5F9</color>
+    <color name="text_secondary">#FF94A3B8</color>
+    <color name="text_hint">#FF64748B</color>
+</resources>

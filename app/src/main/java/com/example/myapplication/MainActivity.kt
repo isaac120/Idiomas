@@ -11,6 +11,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.cardview.widget.CardView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -33,6 +34,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var uploadCard: CardView
     private lateinit var streakCount: TextView
     private lateinit var streakLabel: TextView
+    private lateinit var darkModeSwitch: com.google.android.material.switchmaterial.SwitchMaterial
 
     private var loadedWords: List<WordPair> = emptyList()
     
@@ -66,6 +68,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        // Apply saved theme before setContentView
+        applySavedTheme()
+        
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
@@ -94,6 +99,20 @@ class MainActivity : AppCompatActivity() {
         uploadCard = findViewById(R.id.uploadCard)
         streakCount = findViewById(R.id.streakCount)
         streakLabel = findViewById(R.id.streakLabel)
+        darkModeSwitch = findViewById(R.id.darkModeSwitch)
+        
+        // Set switch state based on current theme
+        val isDarkMode = AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES
+        darkModeSwitch.isChecked = isDarkMode
+    }
+
+    private fun applySavedTheme() {
+        val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
+        val isDarkMode = prefs.getBoolean("dark_mode", false)
+        AppCompatDelegate.setDefaultNightMode(
+            if (isDarkMode) AppCompatDelegate.MODE_NIGHT_YES
+            else AppCompatDelegate.MODE_NIGHT_NO
+        )
     }
 
     private fun updateStreakDisplay() {
@@ -127,6 +146,24 @@ class MainActivity : AppCompatActivity() {
         saveListButton.setOnClickListener {
             showSaveListDialog()
         }
+
+        darkModeSwitch.setOnCheckedChangeListener { _, isChecked ->
+            toggleDarkMode(isChecked)
+        }
+    }
+
+    private fun toggleDarkMode(enableDark: Boolean) {
+        // Save preference
+        getSharedPreferences("app_prefs", MODE_PRIVATE)
+            .edit()
+            .putBoolean("dark_mode", enableDark)
+            .apply()
+        
+        // Apply theme
+        AppCompatDelegate.setDefaultNightMode(
+            if (enableDark) AppCompatDelegate.MODE_NIGHT_YES
+            else AppCompatDelegate.MODE_NIGHT_NO
+        )
     }
 
     private fun openFilePicker() {
