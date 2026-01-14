@@ -1,10 +1,13 @@
 package com.example.myapplication
 
+import android.media.MediaPlayer
 import android.os.Bundle
+import android.speech.tts.TextToSpeech
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -16,8 +19,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.example.myapplication.model.WordPair
+import java.util.Locale
 
-class StudyActivity : AppCompatActivity() {
+class StudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     companion object {
         // Words passed from MainActivity
@@ -43,6 +47,13 @@ class StudyActivity : AppCompatActivity() {
     private lateinit var finalScoreText: TextView
     private lateinit var finishButton: Button
     private lateinit var answerSection: LinearLayout
+    private lateinit var speakerButton: ImageButton
+
+    // Audio
+    private lateinit var tts: TextToSpeech
+    private var ttsInitialized = false
+    private var correctSound: MediaPlayer? = null
+    private var incorrectSound: MediaPlayer? = null
 
     // Study session state
     private var pendingWords: MutableList<WordPair> = mutableListOf()
@@ -70,9 +81,24 @@ class StudyActivity : AppCompatActivity() {
             }
         })
 
+        // Initialize TTS
+        tts = TextToSpeech(this, this)
+
+        // Initialize sound effects
+        correctSound = MediaPlayer.create(this, R.raw.correct)
+        incorrectSound = MediaPlayer.create(this, R.raw.incorrect)
+
         initViews()
         setupListeners()
         startStudySession()
+    }
+
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            ttsInitialized = true
+            // Set default language
+            tts.language = Locale("es", "ES")
+        }
     }
 
     private fun initViews() {
@@ -94,6 +120,7 @@ class StudyActivity : AppCompatActivity() {
         finalScoreText = findViewById(R.id.finalScoreText)
         finishButton = findViewById(R.id.finishButton)
         answerSection = findViewById(R.id.answerSection)
+        speakerButton = findViewById(R.id.speakerButton)
     }
 
     private fun setupListeners() {
@@ -116,6 +143,55 @@ class StudyActivity : AppCompatActivity() {
 
         finishButton.setOnClickListener {
             finish()
+        }
+
+        speakerButton.setOnClickListener {
+            speakCurrentWord()
+        }
+    }
+
+    private fun speakCurrentWord() {
+        if (!ttsInitialized) return
+
+        currentWord?.let { word ->
+            val textToSpeak = word.getDisplayWord()
+            val locale = if (word.showSourceFirst) {
+                Locale("es", "ES") // Spanish
+            } else {
+                Locale.US // English
+            }
+            tts.language = locale
+            tts.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null, "word")
+        }
+    }
+
+    private fun speakWord(text: String, isSpanish: Boolean) {
+        if (!ttsInitialized) return
+
+        val locale = if (isSpanish) {
+            Locale("es", "ES")
+        } else {
+            Locale.US
+        }
+        tts.language = locale
+        tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "answer")
+    }
+
+    private fun playCorrectSound() {
+        correctSound?.let {
+            if (it.isPlaying) {
+                it.seekTo(0)
+            }
+            it.start()
+        }
+    }
+
+    private fun playIncorrectSound() {
+        incorrectSound?.let {
+            if (it.isPlaying) {
+                it.seekTo(0)
+            }
+            it.start()
         }
     }
 
@@ -184,6 +260,18 @@ class StudyActivity : AppCompatActivity() {
             answerInput.isEnabled = false
             submitButton.isEnabled = false
 
+            // Play sound effect
+            if (isCorrect) {
+                playCorrectSound()
+            } else {
+                playIncorrectSound()
+                // Speak the correct answer after a short delay
+                android.os.Handler(mainLooper).postDelayed({
+                    val isSpanish = !word.showSourceFirst // If showing English, answer is Spanish
+                    speakWord(word.getExpectedAnswer(), isSpanish)
+                }, 500)
+            }
+
             // Show feedback
             showFeedback(isCorrect, word.getExpectedAnswer())
 
@@ -242,5 +330,21 @@ class StudyActivity : AppCompatActivity() {
     private fun showSessionComplete() {
         completeOverlay.visibility = View.VISIBLE
         finalScoreText.text = "Completaste $correctCount de $totalWords palabras"
+    }
+
+    override fun onDestroy() {
+        // Release TTS
+        if (::tts.isInitialized) {
+            tts.stop()
+            tts.shutdown()
+        }
+
+        // Release MediaPlayers
+        correctSound?.release()
+        incorrectSound?.release()
+        correctSound = null
+        incorrectSound = null
+
+        super.onDestroy()
     }
 }

@@ -95,6 +95,15 @@
                 android:gravity="center"
                 android:layout_marginTop="8dp" />
 
+            <ImageButton
+                android:id="@+id/speakerButton"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:src="@drawable/ic_speaker"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Escuchar pronunciación"
+                android:layout_marginTop="16dp" />
+
         </LinearLayout>
 
     </androidx.cardview.widget.CardView>
