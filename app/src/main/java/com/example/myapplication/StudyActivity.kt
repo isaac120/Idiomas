@@ -341,7 +341,8 @@ class StudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val progressPercent = if (totalWords > 0) (completed * 100) / totalWords else 0
         
         progressBar.progress = progressPercent
-        progressText.text = "Palabra ${minOf(currentIndex, totalWords)} de $totalWords"
+        // Show correct count out of total (only correct ones count as progress)
+        progressText.text = "Completadas: $correctCount de $totalWords"
     }
 
     private fun showSessionComplete() {
