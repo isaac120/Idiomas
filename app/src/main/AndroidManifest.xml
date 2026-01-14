@@ -24,6 +24,14 @@
             android:name=".StudyActivity"
             android:exported="false"
             android:parentActivityName=".MainActivity" />
+        <activity
+            android:name=".MyListsActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+        <activity
+            android:name=".EditListActivity"
+            android:exported="false"
+            android:parentActivityName=".MyListsActivity" />
     </application>
 
 </manifest>

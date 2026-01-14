@@ -35,6 +35,20 @@
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="8dp" />
 
+    <!-- My Lists Button -->
+    <Button
+        android:id="@+id/myListsButton"
+        android:layout_width="0dp"
+        android:layout_height="48dp"
+        android:text="📚 Mis Listas"
+        android:textColor="@color/primary_blue"
+        android:backgroundTint="@color/white"
+        android:textAllCaps="false"
+        app:layout_constraintTop_toBottomOf="@id/subtitleText"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp" />
+
     <!-- File Upload Area -->
     <androidx.cardview.widget.CardView
         android:id="@+id/uploadCard"
@@ -43,10 +57,10 @@
         app:cardCornerRadius="16dp"
         app:cardElevation="4dp"
         app:cardBackgroundColor="@color/white"
-        app:layout_constraintTop_toBottomOf="@id/subtitleText"
+        app:layout_constraintTop_toBottomOf="@id/myListsButton"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="32dp">
+        android:layout_marginTop="16dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -107,32 +121,39 @@
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="24dp" />
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/wordsPreviewList"
+    <!-- Bottom Buttons -->
+    <LinearLayout
+        android:id="@+id/bottomButtons"
         android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@id/wordsCountText"
-        app:layout_constraintBottom_toTopOf="@id/startButton"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="16dp"
-        android:layout_marginBottom="16dp" />
-
-    <!-- Start Practice Button -->
-    <Button
-        android:id="@+id/startButton"
-        android:layout_width="0dp"
-        android:layout_height="56dp"
-        android:text="🚀 Comenzar Práctica"
-        android:textColor="@color/white"
-        android:textSize="18sp"
-        android:background="@drawable/button_primary"
-        android:visibility="gone"
-        android:textAllCaps="false"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginBottom="24dp" />
+        android:layout_marginBottom="24dp">
+
+        <Button
+            android:id="@+id/saveListButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:text="💾 Guardar Lista"
+            android:textColor="@color/primary_blue"
+            android:backgroundTint="@color/white"
+            android:visibility="gone"
+            android:textAllCaps="false" />
+
+        <Button
+            android:id="@+id/startButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="🚀 Comenzar Práctica"
+            android:textColor="@color/white"
+            android:textSize="18sp"
+            android:background="@drawable/button_primary"
+            android:visibility="gone"
+            android:textAllCaps="false"
+            android:layout_marginTop="8dp" />
+
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
