@@ -207,10 +207,30 @@ class MainActivity : AppCompatActivity() {
                 com.example.myapplication.model.WordPair(it.sourceWord, it.targetWord) 
             }.toMutableList()
 
-            StudyActivity.wordsToStudy = com.example.myapplication.util.FileParser.shuffleAndRandomizeDirection(wordPairs)
-            startActivity(Intent(this@MainActivity, StudyActivity::class.java))
-            overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
+            // Show difficulty selection dialog
+            showDifficultyDialog(wordPairs)
         }
+    }
+
+    private fun showDifficultyDialog(wordPairs: MutableList<com.example.myapplication.model.WordPair>) {
+        val difficulties = arrayOf(
+            "🐢 Sin timer (relajado)",
+            "🟢 Fácil (15 segundos)",
+            "🟡 Normal (10 segundos)",
+            "🔴 Difícil (5 segundos)"
+        )
+        val timerValues = arrayOf(0, 15, 10, 5)
+
+        AlertDialog.Builder(this)
+            .setTitle("⏱️ Selecciona dificultad")
+            .setItems(difficulties) { _, which ->
+                StudyActivity.timerSeconds = timerValues[which]
+                StudyActivity.wordsToStudy = com.example.myapplication.util.FileParser.shuffleAndRandomizeDirection(wordPairs)
+                startActivity(Intent(this, StudyActivity::class.java))
+                overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     private fun toggleDarkMode(enableDark: Boolean) {

@@ -23,6 +23,7 @@ import com.example.myapplication.data.PracticeSession
 import com.example.myapplication.data.StreakManager
 import com.example.myapplication.data.WordStats
 import com.example.myapplication.model.WordPair
+import android.os.CountDownTimer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -33,6 +34,8 @@ class StudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     companion object {
         // Words passed from MainActivity
         var wordsToStudy: MutableList<WordPair> = mutableListOf()
+        // Timer settings (0 = no timer)
+        var timerSeconds: Int = 0
     }
 
     // UI Elements
@@ -55,6 +58,9 @@ class StudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var finishButton: Button
     private lateinit var answerSection: LinearLayout
     private lateinit var speakerButton: ImageButton
+    private lateinit var timerSection: LinearLayout
+    private lateinit var timerText: TextView
+    private lateinit var timerProgressBar: ProgressBar
 
     // Audio
     private lateinit var tts: TextToSpeech
@@ -76,6 +82,10 @@ class StudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private val database by lazy { AppDatabase.getDatabase(this) }
     private val failedWords = mutableSetOf<String>()
     private val correctWords = mutableSetOf<String>()
+
+    // Timer
+    private var countDownTimer: CountDownTimer? = null
+    private var timerEnabled = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -136,6 +146,15 @@ class StudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         finishButton = findViewById(R.id.finishButton)
         answerSection = findViewById(R.id.answerSection)
         speakerButton = findViewById(R.id.speakerButton)
+        timerSection = findViewById(R.id.timerSection)
+        timerText = findViewById(R.id.timerText)
+        timerProgressBar = findViewById(R.id.timerProgressBar)
+
+        // Setup timer if enabled
+        timerEnabled = timerSeconds > 0
+        if (timerEnabled) {
+            timerSection.visibility = View.VISIBLE
+        }
     }
 
     private fun setupListeners() {
@@ -258,9 +277,89 @@ class StudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         updateProgress()
         answerInput.requestFocus()
+        
+        // Start timer if enabled
+        if (timerEnabled) {
+            startTimer()
+        }
+    }
+
+    private fun startTimer() {
+        countDownTimer?.cancel()
+        
+        val totalMillis = timerSeconds * 1000L
+        timerProgressBar.max = 100
+        timerProgressBar.progress = 100
+        timerText.text = timerSeconds.toString()
+        timerText.setTextColor(ContextCompat.getColor(this, R.color.primary_blue))
+        
+        countDownTimer = object : CountDownTimer(totalMillis, 100) {
+            override fun onTick(millisUntilFinished: Long) {
+                val secondsLeft = (millisUntilFinished / 1000).toInt() + 1
+                val progressPercent = ((millisUntilFinished.toFloat() / totalMillis) * 100).toInt()
+                
+                timerText.text = secondsLeft.toString()
+                timerProgressBar.progress = progressPercent
+                
+                // Change color to red when low
+                if (secondsLeft <= 3) {
+                    timerText.setTextColor(ContextCompat.getColor(this@StudyActivity, R.color.error_red))
+                }
+            }
+            
+            override fun onFinish() {
+                timerText.text = "0"
+                timerProgressBar.progress = 0
+                onTimeout()
+            }
+        }.start()
+    }
+
+    private fun cancelTimer() {
+        countDownTimer?.cancel()
+        countDownTimer = null
+    }
+
+    private fun onTimeout() {
+        // Time ran out - treat as incorrect
+        currentWord?.let { word ->
+            playIncorrectSound()
+            
+            // Show feedback briefly
+            answerInput.isEnabled = false
+            submitButton.isEnabled = false
+            
+            failedWords.add(word.getExpectedAnswer())
+            
+            // Move word to end for retry
+            pendingWords.remove(word)
+            pendingWords.add(word)
+            
+            // Show timeout feedback
+            feedbackCard.visibility = View.VISIBLE
+            answerSection.visibility = View.GONE
+            feedbackEmoji.text = "⏱️"
+            feedbackText.text = "¡Tiempo!"
+            feedbackText.setTextColor(ContextCompat.getColor(this, R.color.error_red))
+            feedbackContent.setBackgroundColor(ContextCompat.getColor(this, R.color.error_red_light))
+            correctAnswerText.visibility = View.VISIBLE
+            correctAnswerText.text = "Respuesta: ${word.getExpectedAnswer()}"
+            correctAnswerText.setTextColor(ContextCompat.getColor(this, R.color.text_secondary))
+            
+            if (pendingWords.isEmpty()) {
+                nextButton.text = "Ver resultados"
+            } else {
+                nextButton.text = "Siguiente →"
+            }
+        }
     }
 
     private fun checkAnswer() {
+        // Cancel timer if running
+        if (timerEnabled) {
+            cancelTimer()
+        }
+        
         val userAnswer = answerInput.text.toString().trim()
         
         if (userAnswer.isEmpty()) {

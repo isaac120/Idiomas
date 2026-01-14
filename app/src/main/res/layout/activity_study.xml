@@ -53,6 +53,46 @@
         app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="12dp" />
 
+    <!-- Timer Section -->
+    <LinearLayout
+        android:id="@+id/timerSection"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/progressBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⏱️"
+            android:textSize="20sp" />
+
+        <TextView
+            android:id="@+id/timerText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="10"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="@color/primary_blue"
+            android:layout_marginStart="8dp" />
+
+        <ProgressBar
+            android:id="@+id/timerProgressBar"
+            style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+            android:layout_width="120dp"
+            android:layout_height="6dp"
+            android:max="100"
+            android:progress="100"
+            android:progressTint="@color/primary_blue"
+            android:layout_marginStart="12dp" />
+
+    </LinearLayout>
     <!-- Flashcard -->
     <androidx.cardview.widget.CardView
         android:id="@+id/flashcard"
@@ -60,7 +100,7 @@
         android:layout_height="200dp"
         app:cardCornerRadius="24dp"
         app:cardElevation="8dp"
-        app:layout_constraintTop_toBottomOf="@id/progressBar"
+        app:layout_constraintTop_toBottomOf="@id/timerSection"
         app:layout_constraintBottom_toTopOf="@id/answerSection"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
