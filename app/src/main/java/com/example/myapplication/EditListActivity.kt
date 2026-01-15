@@ -98,12 +98,35 @@ class EditListActivity : AppCompatActivity() {
 
     private fun setupListeners() {
         fabAddWord.setOnClickListener {
-            showAddWordDialog()
+            showAddOptionsDialog()
         }
 
         practiceButton.setOnClickListener {
             startPractice()
         }
+    }
+
+    private fun showAddOptionsDialog() {
+        val options = arrayOf("➕ Agregar una palabra", "📝 Agregar varias palabras")
+        
+        AlertDialog.Builder(this)
+            .setTitle("Agregar palabras")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showAddWordDialog()
+                    1 -> openBulkAdd()
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun openBulkAdd() {
+        val intent = Intent(this, BulkAddWordsActivity::class.java).apply {
+            putExtra(BulkAddWordsActivity.EXTRA_LIST_ID, listId)
+            putExtra(BulkAddWordsActivity.EXTRA_LIST_NAME, listName)
+        }
+        startActivity(intent)
     }
 
     private fun loadWords() {

@@ -36,6 +36,11 @@
             android:name=".StatsActivity"
             android:exported="false"
             android:parentActivityName=".MainActivity" />
+        <activity
+            android:name=".BulkAddWordsActivity"
+            android:exported="false"
+            android:parentActivityName=".EditListActivity"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 
 </manifest>
