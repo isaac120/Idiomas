@@ -10,7 +10,8 @@ import com.example.myapplication.data.VocabularyWord
 
 class WordAdapter(
     private var words: List<VocabularyWord>,
-    private val onDeleteClick: (VocabularyWord) -> Unit
+    private val onDeleteClick: (VocabularyWord) -> Unit,
+    private val onEditClick: (VocabularyWord) -> Unit
 ) : RecyclerView.Adapter<WordAdapter.ViewHolder>() {
 
     class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -33,6 +34,10 @@ class WordAdapter(
         
         holder.deleteButton.setOnClickListener {
             onDeleteClick(word)
+        }
+        
+        holder.itemView.setOnClickListener {
+            onEditClick(word)
         }
     }
 

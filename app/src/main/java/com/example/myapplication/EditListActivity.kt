@@ -94,7 +94,8 @@ class EditListActivity : AppCompatActivity() {
     private fun setupRecyclerView() {
         adapter = WordAdapter(
             words = emptyList(),
-            onDeleteClick = { word -> confirmDeleteWord(word) }
+            onDeleteClick = { word -> confirmDeleteWord(word) },
+            onEditClick = { word -> showEditWordDialog(word) }
         )
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
@@ -251,6 +252,43 @@ class EditListActivity : AppCompatActivity() {
             withContext(Dispatchers.IO) {
                 database.vocabularyDao().removeWordFromList(listId, word.id)
             }
+            loadWords()
+        }
+    }
+
+    private fun showEditWordDialog(word: VocabularyWord) {
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_word, null)
+        val sourceInput = dialogView.findViewById<TextInputEditText>(R.id.sourceWordInput)
+        val targetInput = dialogView.findViewById<TextInputEditText>(R.id.targetWordInput)
+
+        // Pre-fill fields
+        sourceInput.setText(word.sourceWord)
+        targetInput.setText(word.targetWord)
+
+        AlertDialog.Builder(this)
+            .setTitle("✏️ Editar palabra")
+            .setView(dialogView)
+            .setPositiveButton("Guardar") { _, _ ->
+                val newSource = sourceInput.text.toString().trim()
+                val newTarget = targetInput.text.toString().trim()
+
+                if (newSource.isNotEmpty() && newTarget.isNotEmpty()) {
+                    updateWord(word, newSource, newTarget)
+                } else {
+                    Toast.makeText(this, "Completa ambos campos", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun updateWord(word: VocabularyWord, newSource: String, newTarget: String) {
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) {
+                val updatedWord = word.copy(sourceWord = newSource, targetWord = newTarget)
+                database.vocabularyDao().updateWord(updatedWord)
+            }
+            Toast.makeText(this@EditListActivity, "✓ Palabra actualizada", Toast.LENGTH_SHORT).show()
             loadWords()
         }
     }

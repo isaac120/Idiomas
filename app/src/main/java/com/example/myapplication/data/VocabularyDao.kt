@@ -46,6 +46,9 @@ interface VocabularyDao {
     @Query("SELECT COUNT(*) FROM vocabulary_words WHERE listId = :listId")
     suspend fun getWordCountForList(listId: Long): Int
 
+    @androidx.room.Update
+    suspend fun updateWord(word: VocabularyWord)
+
     // Transaction to insert list with words
     @Transaction
     suspend fun insertListWithWords(name: String, words: List<Pair<String, String>>): Long {
