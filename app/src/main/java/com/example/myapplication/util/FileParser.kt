@@ -5,6 +5,8 @@ import android.net.Uri
 import com.example.myapplication.model.WordPair
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.io.File
+import java.io.FileOutputStream
 
 /**
  * Utilidad para parsear archivos CSV con pares de palabras.
@@ -70,5 +72,37 @@ object FileParser {
         return wordPairs.map { pair ->
             pair.copy(showSourceFirst = listOf(true, false).random())
         }.shuffled().toMutableList()
+    }
+
+    /**
+     * Genera un archivo CSV a partir de una lista de pares de palabras.
+     * @param context Contexto de la aplicación
+     * @param fileName Nombre del archivo a crear (sin extensión)
+     * @param words Lista de pares de palabras
+     * @return Archivo generado
+     */
+    fun generateCSV(context: Context, fileName: String, words: List<WordPair>): File {
+        // Crear directorio de caché si no existe
+        val cachePath = File(context.cacheDir, "lists")
+        cachePath.mkdirs()
+        
+        // Crear archivo
+        val file = File(cachePath, "$fileName.csv")
+        
+        FileOutputStream(file).use { stream ->
+            // Escribir BOM para Excel (UTF-8)
+            stream.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
+            
+            // Escribir encabezado
+            stream.write("Español,Inglés\n".toByteArray())
+            
+            // Escribir palabras
+            words.forEach { word ->
+                val line = "${word.sourceWord},${word.targetWord}\n"
+                stream.write(line.toByteArray())
+            }
+        }
+        
+        return file
     }
 }

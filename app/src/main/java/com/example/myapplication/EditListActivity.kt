@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
+import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -13,6 +14,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -38,6 +40,7 @@ class EditListActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var emptyState: LinearLayout
     private lateinit var practiceButton: Button
+    private lateinit var exportButton: ImageButton
     private lateinit var fabAddWord: FloatingActionButton
     private lateinit var adapter: WordAdapter
 
@@ -82,6 +85,7 @@ class EditListActivity : AppCompatActivity() {
         recyclerView = findViewById(R.id.wordsRecyclerView)
         emptyState = findViewById(R.id.emptyState)
         practiceButton = findViewById(R.id.practiceButton)
+        exportButton = findViewById(R.id.exportButton)
         fabAddWord = findViewById(R.id.fabAddWord)
 
         listTitle.text = listName
@@ -103,6 +107,53 @@ class EditListActivity : AppCompatActivity() {
 
         practiceButton.setOnClickListener {
             startPractice()
+        }
+
+        exportButton.setOnClickListener {
+            exportList()
+        }
+    }
+
+    private fun exportList() {
+        lifecycleScope.launch {
+            val words = withContext(Dispatchers.IO) {
+                database.vocabularyDao().getWordsForList(listId)
+            }
+
+            if (words.isEmpty()) {
+                Toast.makeText(this@EditListActivity, "La lista está vacía", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            try {
+                // Convert to WordPair
+                val wordPairs = words.map { WordPair(it.sourceWord, it.targetWord) }
+                
+                // Generate CSV
+                val fileName = "lista_${listName.replace(" ", "_")}"
+                val file = FileParser.generateCSV(this@EditListActivity, fileName, wordPairs)
+                
+                // Get URI
+                val uri = FileProvider.getUriForFile(
+                    this@EditListActivity,
+                    "${packageName}.fileprovider",
+                    file
+                )
+                
+                // create share intent
+                val intent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/csv"
+                    putExtra(Intent.EXTRA_SUBJECT, "Lista de vocabulario: $listName")
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                
+                startActivity(Intent.createChooser(intent, "Exportar lista CSV"))
+                
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(this@EditListActivity, "Error al exportar: ${e.message}", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
