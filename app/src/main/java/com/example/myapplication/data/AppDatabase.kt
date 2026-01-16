@@ -6,25 +6,22 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 /**
- * Base de datos Room para vocabulario y estadísticas.
+ * Base de datos Room para listas flexibles y estadísticas.
  */
 @Database(
     entities = [
-        VocabularyList::class, 
-        VocabularyWord::class,
+        FlexibleList::class,
+        ListItem::class,
         PracticeSession::class,
-        WordStats::class,
-        VerbList::class,
-        IrregularVerb::class
+        WordStats::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
-    abstract fun vocabularyDao(): VocabularyDao
+    abstract fun flexibleDao(): FlexibleDao
     abstract fun statsDao(): StatsDao
-    abstract fun verbDao(): VerbDao
 
     companion object {
         @Volatile

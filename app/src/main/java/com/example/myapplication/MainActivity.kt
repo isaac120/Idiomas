@@ -15,10 +15,12 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.myapplication.data.AppDatabase
+import com.example.myapplication.data.FlexibleList
 import com.example.myapplication.data.StreakManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 
 class MainActivity : AppCompatActivity() {
 
@@ -131,14 +133,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateListsCount() {
         lifecycleScope.launch {
-            val vocabCount = withContext(Dispatchers.IO) {
-                database.vocabularyDao().getAllLists().size
+            val count = withContext(Dispatchers.IO) {
+                database.flexibleDao().getAllLists().size
             }
-            val verbCount = withContext(Dispatchers.IO) {
-                database.verbDao().getAllLists().size
-            }
-            val total = vocabCount + verbCount
-            listsCountText.text = "$total listas"
+            listsCountText.text = "$count listas"
         }
     }
 
@@ -168,14 +166,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun startPractice() {
         lifecycleScope.launch {
-            val vocabLists = withContext(Dispatchers.IO) {
-                database.vocabularyDao().getAllLists()
-            }
-            val verbLists = withContext(Dispatchers.IO) {
-                database.verbDao().getAllLists()
+            val lists = withContext(Dispatchers.IO) {
+                database.flexibleDao().getAllLists()
             }
 
-            if (vocabLists.isEmpty() && verbLists.isEmpty()) {
+            if (lists.isEmpty()) {
                 Toast.makeText(
                     this@MainActivity,
                     "¡Primero agrega listas en 📚 Mis Listas!",
@@ -185,81 +180,49 @@ class MainActivity : AppCompatActivity() {
                 return@launch
             }
 
-            // Combine lists with type indicators
-            val allItems = mutableListOf<Pair<String, Any>>()
-            vocabLists.forEach { allItems.add("📖 ${it.name}" to it) }
-            verbLists.forEach { allItems.add("🔤 ${it.name}" to it) }
+            // Build list names with column info
+            val listNames = lists.map { list ->
+                try {
+                    val headers = JSONArray(list.columnHeaders)
+                    val headerNames = (0 until headers.length()).map { headers.getString(it) }
+                    "${list.name} (${headerNames.joinToString(" • ")})"
+                } catch (e: Exception) {
+                    list.name
+                }
+            }.toTypedArray()
 
-            val listNames = allItems.map { it.first }.toTypedArray()
             AlertDialog.Builder(this@MainActivity)
                 .setTitle("📚 Selecciona una lista")
                 .setItems(listNames) { _, which ->
-                    val selected = allItems[which].second
-                    when (selected) {
-                        is com.example.myapplication.data.VocabularyList -> startStudyWithList(selected.id)
-                        is com.example.myapplication.data.VerbList -> startVerbStudy(selected.id)
-                    }
+                    startStudyWithFlexibleList(lists[which])
                 }
                 .setNegativeButton("Cancelar", null)
                 .show()
         }
     }
 
-    private fun startStudyWithList(listId: Long) {
+    private fun startStudyWithFlexibleList(list: FlexibleList) {
         lifecycleScope.launch {
-            val words = withContext(Dispatchers.IO) {
-                database.vocabularyDao().getWordsForList(listId)
+            val items = withContext(Dispatchers.IO) {
+                database.flexibleDao().getItemsForList(list.id)
             }
 
-            if (words.isEmpty()) {
+            if (items.isEmpty()) {
                 Toast.makeText(this@MainActivity, "Esta lista está vacía", Toast.LENGTH_SHORT).show()
                 return@launch
             }
 
-            // Convert to WordPair and start study
-            val wordPairs = words.map { 
-                com.example.myapplication.model.WordPair(it.sourceWord, it.targetWord) 
-            }.toMutableList()
-
-            // Show difficulty selection dialog
-            showDifficultyDialog(wordPairs)
-        }
-    }
-
-    private fun showDifficultyDialog(wordPairs: MutableList<com.example.myapplication.model.WordPair>) {
-        val difficulties = arrayOf(
-            "🐢 Sin timer (relajado)",
-            "🟢 Fácil (15 segundos)",
-            "🟡 Normal (10 segundos)",
-            "🔴 Difícil (5 segundos)"
-        )
-        val timerValues = arrayOf(0, 15, 10, 5)
-
-        AlertDialog.Builder(this)
-            .setTitle("⏱️ Selecciona dificultad")
-            .setItems(difficulties) { _, which ->
-                StudyActivity.timerSeconds = timerValues[which]
-                StudyActivity.wordsToStudy = com.example.myapplication.util.FileParser.shuffleAndRandomizeDirection(wordPairs)
-                startActivity(Intent(this, StudyActivity::class.java))
-                overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
-            }
-            .setNegativeButton("Cancelar", null)
-            .show()
-    }
-
-    private fun startVerbStudy(listId: Long) {
-        lifecycleScope.launch {
-            val verbs = withContext(Dispatchers.IO) {
-                database.verbDao().getVerbsForList(listId)
+            // Parse column headers
+            val headers = try {
+                val arr = JSONArray(list.columnHeaders)
+                (0 until arr.length()).map { arr.getString(it) }
+            } catch (e: Exception) {
+                (1..list.columnCount).map { "Columna $it" }
             }
 
-            if (verbs.isEmpty()) {
-                Toast.makeText(this@MainActivity, "Esta lista está vacía", Toast.LENGTH_SHORT).show()
-                return@launch
-            }
-
-            VerbStudyActivity.verbsToStudy = verbs.shuffled().toMutableList()
-            startActivity(Intent(this@MainActivity, VerbStudyActivity::class.java))
+            FlexibleStudyActivity.itemsToStudy = items.shuffled().toMutableList()
+            FlexibleStudyActivity.columnHeaders = headers
+            startActivity(Intent(this@MainActivity, FlexibleStudyActivity::class.java))
             overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
         }
     }

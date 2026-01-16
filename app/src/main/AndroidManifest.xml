@@ -21,25 +21,25 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".StudyActivity"
-            android:exported="false"
-            android:parentActivityName=".MainActivity" />
-        <activity
             android:name=".MyListsActivity"
             android:exported="false"
             android:parentActivityName=".MainActivity" />
         <activity
-            android:name=".EditListActivity"
+            android:name=".EditFlexibleListActivity"
             android:exported="false"
             android:parentActivityName=".MyListsActivity" />
+        <activity
+            android:name=".FlexibleStudyActivity"
+            android:exported="false"
+            android:parentActivityName=".EditFlexibleListActivity" />
         <activity
             android:name=".StatsActivity"
             android:exported="false"
             android:parentActivityName=".MainActivity" />
         <activity
-            android:name=".BulkAddWordsActivity"
+            android:name=".BulkAddFlexibleActivity"
             android:exported="false"
-            android:parentActivityName=".EditListActivity"
+            android:parentActivityName=".EditFlexibleListActivity"
             android:windowSoftInputMode="adjustResize" />
 
         <provider
@@ -51,24 +51,6 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/provider_paths" />
         </provider>
-
-        <activity
-            android:name=".VerbListsActivity"
-            android:exported="false"
-            android:parentActivityName=".MainActivity" />
-        <activity
-            android:name=".EditVerbListActivity"
-            android:exported="false"
-            android:parentActivityName=".VerbListsActivity" />
-        <activity
-            android:name=".VerbStudyActivity"
-            android:exported="false"
-            android:parentActivityName=".EditVerbListActivity" />
-        <activity
-            android:name=".BulkAddVerbsActivity"
-            android:exported="false"
-            android:parentActivityName=".EditVerbListActivity"
-            android:windowSoftInputMode="adjustResize" />
     </application>
 
 </manifest>
