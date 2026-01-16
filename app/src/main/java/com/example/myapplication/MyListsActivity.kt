@@ -17,7 +17,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.myapplication.data.AppDatabase
-import com.example.myapplication.data.VocabularyList
+import com.example.myapplication.model.UnifiedList
 import com.example.myapplication.model.WordPair
 import com.example.myapplication.util.FileParser
 import com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -30,7 +30,7 @@ class MyListsActivity : AppCompatActivity() {
     private lateinit var recyclerView: RecyclerView
     private lateinit var emptyState: LinearLayout
     private lateinit var fabAddList: FloatingActionButton
-    private lateinit var adapter: VocabularyListAdapter
+    private lateinit var adapter: UnifiedListAdapter
     
     private val database by lazy { AppDatabase.getDatabase(this) }
 
@@ -98,14 +98,15 @@ class MyListsActivity : AppCompatActivity() {
     }
 
     private fun showAddOptionsDialog() {
-        val options = arrayOf("📂 Importar CSV", "✏️ Crear lista vacía")
+        val options = arrayOf("📂 Importar CSV (vocabulario)", "✏️ Lista de vocabulario vacía", "🔤 Lista de verbos vacía")
         
         AlertDialog.Builder(this)
             .setTitle("➕ Agregar lista")
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> openFilePicker()
-                    1 -> showCreateListDialog()
+                    1 -> showCreateVocabularyListDialog()
+                    2 -> showCreateVerbListDialog()
                 }
             }
             .setNegativeButton("Cancelar", null)
@@ -172,10 +173,10 @@ class MyListsActivity : AppCompatActivity() {
     }
 
     private fun setupRecyclerView() {
-        adapter = VocabularyListAdapter(
+        adapter = UnifiedListAdapter(
             lists = emptyList(),
-            onItemClick = { list -> openEditList(list) },
-            onDeleteClick = { list -> confirmDeleteList(list) }
+            onItemClick = { item -> openList(item) },
+            onDeleteClick = { item -> confirmDeleteList(item) }
         )
         recyclerView.layoutManager = LinearLayoutManager(this)
         recyclerView.adapter = adapter
@@ -183,13 +184,22 @@ class MyListsActivity : AppCompatActivity() {
 
     private fun loadLists() {
         lifecycleScope.launch {
-            val lists = withContext(Dispatchers.IO) {
+            val vocabLists = withContext(Dispatchers.IO) {
                 database.vocabularyDao().getAllLists()
             }
+            val verbLists = withContext(Dispatchers.IO) {
+                database.verbDao().getAllLists()
+            }
+
+            // Combine and sort by creation date (newest first)
+            val unified = mutableListOf<UnifiedList>()
+            unified.addAll(vocabLists.map { UnifiedList.Vocabulary(it) })
+            unified.addAll(verbLists.map { UnifiedList.Verbs(it) })
+            unified.sortByDescending { it.createdAt }
+
+            adapter.updateLists(unified)
             
-            adapter.updateLists(lists)
-            
-            if (lists.isEmpty()) {
+            if (unified.isEmpty()) {
                 emptyState.visibility = View.VISIBLE
                 recyclerView.visibility = View.GONE
             } else {
@@ -199,20 +209,20 @@ class MyListsActivity : AppCompatActivity() {
         }
     }
 
-    private fun showCreateListDialog() {
+    private fun showCreateVocabularyListDialog() {
         val editText = EditText(this).apply {
             hint = "Nombre de la lista"
             setPadding(48, 32, 48, 32)
         }
 
         AlertDialog.Builder(this)
-            .setTitle("📝 Nueva lista")
+            .setTitle("📖 Nueva lista de vocabulario")
             .setMessage("Dale un nombre a tu nueva lista:")
             .setView(editText)
             .setPositiveButton("Crear") { _, _ ->
                 val name = editText.text.toString().trim()
                 if (name.isNotEmpty()) {
-                    createEmptyList(name)
+                    createVocabularyList(name)
                 } else {
                     Toast.makeText(this, "Ingresa un nombre", Toast.LENGTH_SHORT).show()
                 }
@@ -221,7 +231,29 @@ class MyListsActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun createEmptyList(name: String) {
+    private fun showCreateVerbListDialog() {
+        val editText = EditText(this).apply {
+            hint = "Nombre de la lista"
+            setPadding(48, 32, 48, 32)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("🔤 Nueva lista de verbos")
+            .setMessage("Dale un nombre a tu nueva lista:")
+            .setView(editText)
+            .setPositiveButton("Crear") { _, _ ->
+                val name = editText.text.toString().trim()
+                if (name.isNotEmpty()) {
+                    createVerbList(name)
+                } else {
+                    Toast.makeText(this, "Ingresa un nombre", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun createVocabularyList(name: String) {
         lifecycleScope.launch {
             val listId = withContext(Dispatchers.IO) {
                 database.vocabularyDao().createEmptyList(name)
@@ -238,30 +270,66 @@ class MyListsActivity : AppCompatActivity() {
         }
     }
 
-    private fun openEditList(list: VocabularyList) {
-        val intent = Intent(this, EditListActivity::class.java).apply {
-            putExtra(EditListActivity.EXTRA_LIST_ID, list.id)
-            putExtra(EditListActivity.EXTRA_LIST_NAME, list.name)
+    private fun createVerbList(name: String) {
+        lifecycleScope.launch {
+            val listId = withContext(Dispatchers.IO) {
+                database.verbDao().createEmptyList(name)
+            }
+            
+            Toast.makeText(this@MyListsActivity, "✓ Lista creada", Toast.LENGTH_SHORT).show()
+            
+            val intent = Intent(this@MyListsActivity, EditVerbListActivity::class.java).apply {
+                putExtra(EditVerbListActivity.EXTRA_LIST_ID, listId)
+                putExtra(EditVerbListActivity.EXTRA_LIST_NAME, name)
+            }
+            startActivity(intent)
+            overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
         }
-        startActivity(intent)
+    }
+
+    private fun openList(item: UnifiedList) {
+        when (item) {
+            is UnifiedList.Vocabulary -> {
+                val intent = Intent(this, EditListActivity::class.java).apply {
+                    putExtra(EditListActivity.EXTRA_LIST_ID, item.id)
+                    putExtra(EditListActivity.EXTRA_LIST_NAME, item.name)
+                }
+                startActivity(intent)
+            }
+            is UnifiedList.Verbs -> {
+                val intent = Intent(this, EditVerbListActivity::class.java).apply {
+                    putExtra(EditVerbListActivity.EXTRA_LIST_ID, item.id)
+                    putExtra(EditVerbListActivity.EXTRA_LIST_NAME, item.name)
+                }
+                startActivity(intent)
+            }
+        }
         overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
     }
 
-    private fun confirmDeleteList(list: VocabularyList) {
+    private fun confirmDeleteList(item: UnifiedList) {
+        val type = when (item) {
+            is UnifiedList.Vocabulary -> "vocabulario"
+            is UnifiedList.Verbs -> "verbos"
+        }
+        
         AlertDialog.Builder(this)
             .setTitle("Eliminar lista")
-            .setMessage("¿Estás seguro de eliminar \"${list.name}\"?\n\nEsta acción no se puede deshacer.")
+            .setMessage("¿Eliminar \"${item.name}\"?\n\nEsta acción no se puede deshacer.")
             .setPositiveButton("Eliminar") { _, _ ->
-                deleteList(list)
+                deleteList(item)
             }
             .setNegativeButton("Cancelar", null)
             .show()
     }
 
-    private fun deleteList(list: VocabularyList) {
+    private fun deleteList(item: UnifiedList) {
         lifecycleScope.launch {
             withContext(Dispatchers.IO) {
-                database.vocabularyDao().deleteList(list.id)
+                when (item) {
+                    is UnifiedList.Vocabulary -> database.vocabularyDao().deleteList(item.id)
+                    is UnifiedList.Verbs -> database.verbDao().deleteList(item.id)
+                }
             }
             loadLists()
         }

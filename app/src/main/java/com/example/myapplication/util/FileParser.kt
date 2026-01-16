@@ -34,10 +34,8 @@ object FileParser {
                         if (isFirstLine) {
                             isFirstLine = false
                             val firstLine = line?.lowercase() ?: ""
-                            if (firstLine.contains("español") || 
-                                firstLine.contains("ingles") ||
-                                firstLine.contains("english") ||
-                                firstLine.contains("spanish")) {
+                            // Skip if it looks like a header (common header words)
+                            if (isHeaderLine(firstLine)) {
                                 continue
                             }
                         }
@@ -61,6 +59,23 @@ object FileParser {
         }
         
         return wordPairs
+    }
+
+    /**
+     * Detecta si una línea es un encabezado de CSV
+     */
+    fun isHeaderLine(line: String): Boolean {
+        val headerWords = listOf(
+            // Spanish headers
+            "español", "espanol", "ingles", "inglés", "palabra", "traduccion", "traducción",
+            // English headers
+            "english", "spanish", "word", "translation", "source", "target",
+            // Verb headers
+            "base", "past", "participle", "infinitive", "simple", "form",
+            // Generic
+            "header", "column", "columna", "#"
+        )
+        return headerWords.any { line.contains(it) }
     }
 
     /**

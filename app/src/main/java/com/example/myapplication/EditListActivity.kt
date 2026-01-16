@@ -12,7 +12,9 @@ import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.ViewCompat
+import android.net.Uri
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
@@ -47,7 +49,13 @@ class EditListActivity : AppCompatActivity() {
     private var listId: Long = -1
     private var listName: String = ""
     
+
+    
     private val database by lazy { AppDatabase.getDatabase(this) }
+
+    private val csvImportLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let { importFromCSV(it) }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -159,7 +167,7 @@ class EditListActivity : AppCompatActivity() {
     }
 
     private fun showAddOptionsDialog() {
-        val options = arrayOf("➕ Agregar una palabra", "📝 Agregar varias palabras")
+        val options = arrayOf("➕ Agregar una palabra", "📝 Agregar varias palabras", "📂 Cargar desde CSV")
         
         AlertDialog.Builder(this)
             .setTitle("Agregar palabras")
@@ -167,6 +175,7 @@ class EditListActivity : AppCompatActivity() {
                 when (which) {
                     0 -> showAddWordDialog()
                     1 -> openBulkAdd()
+                    2 -> csvImportLauncher.launch("text/comma-separated-values")
                 }
             }
             .setNegativeButton("Cancelar", null)
@@ -253,6 +262,31 @@ class EditListActivity : AppCompatActivity() {
                 database.vocabularyDao().removeWordFromList(listId, word.id)
             }
             loadWords()
+        }
+    }
+
+    private fun importFromCSV(uri: Uri) {
+        lifecycleScope.launch {
+            try {
+                val words = withContext(Dispatchers.IO) {
+                    FileParser.parseCSV(this@EditListActivity, uri)
+                }
+
+                if (words.isNotEmpty()) {
+                    withContext(Dispatchers.IO) {
+                        words.forEach { pair ->
+                            database.vocabularyDao().addWordToList(listId, pair.sourceWord, pair.targetWord)
+                        }
+                    }
+                    Toast.makeText(this@EditListActivity, "✅ ${words.size} palabras importadas", Toast.LENGTH_SHORT).show()
+                    loadWords()
+                } else {
+                    Toast.makeText(this@EditListActivity, "⚠️ No se encontraron palabras validas", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(this@EditListActivity, "Error al importar: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

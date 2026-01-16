@@ -131,10 +131,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateListsCount() {
         lifecycleScope.launch {
-            val count = withContext(Dispatchers.IO) {
+            val vocabCount = withContext(Dispatchers.IO) {
                 database.vocabularyDao().getAllLists().size
             }
-            listsCountText.text = "$count listas"
+            val verbCount = withContext(Dispatchers.IO) {
+                database.verbDao().getAllLists().size
+            }
+            val total = vocabCount + verbCount
+            listsCountText.text = "$total listas"
         }
     }
 
@@ -164,11 +168,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun startPractice() {
         lifecycleScope.launch {
-            val lists = withContext(Dispatchers.IO) {
+            val vocabLists = withContext(Dispatchers.IO) {
                 database.vocabularyDao().getAllLists()
             }
+            val verbLists = withContext(Dispatchers.IO) {
+                database.verbDao().getAllLists()
+            }
 
-            if (lists.isEmpty()) {
+            if (vocabLists.isEmpty() && verbLists.isEmpty()) {
                 Toast.makeText(
                     this@MainActivity,
                     "¡Primero agrega listas en 📚 Mis Listas!",
@@ -178,13 +185,20 @@ class MainActivity : AppCompatActivity() {
                 return@launch
             }
 
-            // Show list selection dialog
-            val listNames = lists.map { it.name }.toTypedArray()
+            // Combine lists with type indicators
+            val allItems = mutableListOf<Pair<String, Any>>()
+            vocabLists.forEach { allItems.add("📖 ${it.name}" to it) }
+            verbLists.forEach { allItems.add("🔤 ${it.name}" to it) }
+
+            val listNames = allItems.map { it.first }.toTypedArray()
             AlertDialog.Builder(this@MainActivity)
                 .setTitle("📚 Selecciona una lista")
                 .setItems(listNames) { _, which ->
-                    val selectedList = lists[which]
-                    startStudyWithList(selectedList.id)
+                    val selected = allItems[which].second
+                    when (selected) {
+                        is com.example.myapplication.data.VocabularyList -> startStudyWithList(selected.id)
+                        is com.example.myapplication.data.VerbList -> startVerbStudy(selected.id)
+                    }
                 }
                 .setNegativeButton("Cancelar", null)
                 .show()
@@ -231,6 +245,23 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton("Cancelar", null)
             .show()
+    }
+
+    private fun startVerbStudy(listId: Long) {
+        lifecycleScope.launch {
+            val verbs = withContext(Dispatchers.IO) {
+                database.verbDao().getVerbsForList(listId)
+            }
+
+            if (verbs.isEmpty()) {
+                Toast.makeText(this@MainActivity, "Esta lista está vacía", Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            VerbStudyActivity.verbsToStudy = verbs.shuffled().toMutableList()
+            startActivity(Intent(this@MainActivity, VerbStudyActivity::class.java))
+            overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
+        }
     }
 
     private fun toggleDarkMode(enableDark: Boolean) {

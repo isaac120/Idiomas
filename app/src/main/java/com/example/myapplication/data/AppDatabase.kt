@@ -13,15 +13,18 @@ import androidx.room.RoomDatabase
         VocabularyList::class, 
         VocabularyWord::class,
         PracticeSession::class,
-        WordStats::class
+        WordStats::class,
+        VerbList::class,
+        IrregularVerb::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun vocabularyDao(): VocabularyDao
     abstract fun statsDao(): StatsDao
+    abstract fun verbDao(): VerbDao
 
     companion object {
         @Volatile

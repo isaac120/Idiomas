@@ -51,6 +51,24 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/provider_paths" />
         </provider>
+
+        <activity
+            android:name=".VerbListsActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
+        <activity
+            android:name=".EditVerbListActivity"
+            android:exported="false"
+            android:parentActivityName=".VerbListsActivity" />
+        <activity
+            android:name=".VerbStudyActivity"
+            android:exported="false"
+            android:parentActivityName=".EditVerbListActivity" />
+        <activity
+            android:name=".BulkAddVerbsActivity"
+            android:exported="false"
+            android:parentActivityName=".EditVerbListActivity"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 
 </manifest>
