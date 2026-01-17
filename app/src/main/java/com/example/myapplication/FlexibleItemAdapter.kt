@@ -13,6 +13,7 @@ import org.json.JSONArray
 class FlexibleItemAdapter(
     private var items: List<ListItem>,
     private var columnCount: Int,
+    private val onItemClick: (ListItem) -> Unit,
     private val onDeleteClick: (ListItem) -> Unit
 ) : RecyclerView.Adapter<FlexibleItemAdapter.ViewHolder>() {
 
@@ -44,6 +45,8 @@ class FlexibleItemAdapter(
                 e.printStackTrace()
             }
 
+            // Click on item to edit
+            itemView.setOnClickListener { onItemClick(item) }
             deleteButton.setOnClickListener { onDeleteClick(item) }
         }
     }

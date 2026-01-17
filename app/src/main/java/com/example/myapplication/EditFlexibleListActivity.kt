@@ -117,6 +117,7 @@ class EditFlexibleListActivity : AppCompatActivity() {
         adapter = FlexibleItemAdapter(
             items = emptyList(),
             columnCount = 2,
+            onItemClick = { item -> showEditItemDialog(item) },
             onDeleteClick = { item -> deleteItem(item) }
         )
         recyclerView.layoutManager = LinearLayoutManager(this)
@@ -554,6 +555,56 @@ class EditFlexibleListActivity : AppCompatActivity() {
         lifecycleScope.launch {
             withContext(Dispatchers.IO) {
                 database.flexibleDao().removeItemFromList(listId, item.id)
+            }
+            loadItems()
+        }
+    }
+
+    private fun showEditItemDialog(item: ListItem) {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 24, 48, 24)
+        }
+
+        val inputs = mutableListOf<EditText>()
+        
+        try {
+            val values = JSONArray(item.values)
+            columnHeaders.forEachIndexed { index, header ->
+                val editText = EditText(this).apply {
+                    hint = header
+                    setText(values.optString(index, ""))
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = 16 }
+                }
+                inputs.add(editText)
+                container.addView(editText)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("✏️ Editar item")
+            .setView(container)
+            .setPositiveButton("Guardar") { _, _ ->
+                val newValues = inputs.map { it.text.toString().trim() }
+                if (newValues.any { it.isNotEmpty() }) {
+                    updateItem(item, newValues)
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun updateItem(item: ListItem, values: List<String>) {
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) {
+                val valuesJson = values.joinToString(",", "[", "]") { "\"${it.replace("\"", "\\\"")}\"" }
+                database.flexibleDao().updateItem(item.copy(values = valuesJson))
             }
             loadItems()
         }

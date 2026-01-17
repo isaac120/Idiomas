@@ -1,7 +1,7 @@
 package com.example.myapplication
 
 import android.os.Bundle
-import android.view.View
+import android.view.Gravity
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageButton
@@ -23,6 +23,7 @@ class BulkAddFlexibleActivity : AppCompatActivity() {
     companion object {
         var listId: Long = -1
         var columnHeaders: List<String> = emptyList()
+        private const val COLUMN_WIDTH = 200 // dp per column
     }
 
     private lateinit var headersRow: LinearLayout
@@ -33,6 +34,7 @@ class BulkAddFlexibleActivity : AppCompatActivity() {
 
     private val database by lazy { AppDatabase.getDatabase(this) }
     private val rows = mutableListOf<List<EditText>>()
+    private var columnWidthPx = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,9 +46,13 @@ class BulkAddFlexibleActivity : AppCompatActivity() {
             return
         }
 
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
+        // Calculate column width in pixels
+        val density = resources.displayMetrics.density
+        columnWidthPx = (COLUMN_WIDTH * density).toInt()
+
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.header)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            v.setPadding(v.paddingLeft, systemBars.top + 16, v.paddingRight, v.paddingBottom)
             insets
         }
 
@@ -71,20 +77,22 @@ class BulkAddFlexibleActivity : AppCompatActivity() {
             val headerView = TextView(this).apply {
                 text = header
                 textSize = 14f
-                setTextColor(getColor(R.color.primary_blue))
-                setPadding(16, 8, 16, 8)
+                setTextColor(getColor(R.color.white))
+                setPadding(16, 12, 16, 12)
+                gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(
-                    0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    1f
-                )
+                    columnWidthPx,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    marginEnd = 8
+                }
             }
             headersRow.addView(headerView)
         }
 
         // Add space for delete button
-        val spacer = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(40, 1)
+        val spacer = android.view.View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(56, 1)
         }
         headersRow.addView(spacer)
     }
@@ -96,25 +104,26 @@ class BulkAddFlexibleActivity : AppCompatActivity() {
     private fun addRow() {
         val rowLayout = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(8, 0, 8, 0)
             layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = 8 }
+            ).apply { bottomMargin = 16 }
         }
 
         val editTexts = mutableListOf<EditText>()
 
-        columnHeaders.forEachIndexed { index, header ->
+        columnHeaders.forEachIndexed { _, header ->
             val editText = EditText(this).apply {
                 hint = header
                 textSize = 14f
                 layoutParams = LinearLayout.LayoutParams(
-                    0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    1f
-                ).apply { marginEnd = 4 }
+                    columnWidthPx,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { marginEnd = 12 }
                 setBackgroundResource(R.drawable.input_background)
-                setPadding(16, 12, 16, 12)
+                setPadding(20, 20, 20, 20)
             }
             editTexts.add(editText)
             rowLayout.addView(editText)
@@ -123,9 +132,7 @@ class BulkAddFlexibleActivity : AppCompatActivity() {
         val deleteButton = ImageButton(this).apply {
             setImageResource(android.R.drawable.ic_menu_close_clear_cancel)
             setBackgroundResource(android.R.color.transparent)
-            layoutParams = LinearLayout.LayoutParams(40, 40).apply {
-                gravity = android.view.Gravity.CENTER_VERTICAL
-            }
+            layoutParams = LinearLayout.LayoutParams(56, 56)
             setOnClickListener {
                 if (rows.size > 1) {
                     val idx = rows.indexOf(editTexts)

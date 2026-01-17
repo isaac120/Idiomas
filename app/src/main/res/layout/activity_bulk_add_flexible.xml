@@ -6,23 +6,26 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="@color/background_light"
-    android:padding="16dp"
     tools:context=".BulkAddFlexibleActivity">
 
-    <!-- Title -->
+    <!-- Header with safe area for notch -->
     <LinearLayout
+        android:id="@+id/header"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:layout_marginBottom="16dp">
+        android:padding="20dp"
+        android:paddingTop="48dp"
+        android:background="@color/card_background"
+        android:elevation="4dp">
 
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="📝 Agregar varios items"
-            android:textSize="20sp"
+            android:textSize="22sp"
             android:textStyle="bold"
             android:textColor="@color/text_primary" />
 
@@ -32,55 +35,92 @@
             android:layout_height="wrap_content"
             android:text="5 filas"
             android:textSize="14sp"
-            android:textColor="@color/text_secondary" />
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="6dp"
+            android:background="@drawable/input_background"
+            android:textColor="@color/primary_blue" />
 
     </LinearLayout>
 
-    <!-- Headers Row -->
-    <LinearLayout
-        android:id="@+id/headersRow"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:background="@color/primary_blue"
-        android:padding="8dp"
-        android:layout_marginBottom="8dp" />
-
-    <!-- Scrollable Rows Container -->
-    <ScrollView
+    <!-- Single HorizontalScrollView for both headers and rows -->
+    <HorizontalScrollView
+        android:id="@+id/horizontalScroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginBottom="16dp">
+        android:scrollbars="horizontal"
+        android:fadeScrollbars="true"
+        android:fillViewport="true">
 
         <LinearLayout
-            android:id="@+id/rowsContainer"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <!-- Column Headers -->
+            <LinearLayout
+                android:id="@+id/headersRow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:background="@color/primary_blue"
+                android:paddingVertical="12dp"
+                android:paddingHorizontal="16dp"
+                android:minWidth="1000dp" />
+
+            <!-- Rows Container with vertical scroll -->
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:scrollbars="vertical"
+                android:fadeScrollbars="true"
+                android:padding="8dp">
+
+                <LinearLayout
+                    android:id="@+id/rowsContainer"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:minWidth="1000dp" />
+
+            </ScrollView>
+
+        </LinearLayout>
+
+    </HorizontalScrollView>
+
+    <!-- Bottom Actions -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:background="@color/card_background"
+        android:elevation="8dp">
+
+        <!-- Add Row Button -->
+        <Button
+            android:id="@+id/addRowButton"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical" />
+            android:layout_height="48dp"
+            android:text="➕ Agregar fila"
+            android:textAllCaps="false"
+            android:textColor="@color/primary_blue"
+            android:backgroundTint="@color/background_light"
+            android:layout_marginBottom="8dp" />
 
-    </ScrollView>
+        <!-- Save Button -->
+        <Button
+            android:id="@+id/saveButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="💾 Guardar items"
+            android:textColor="@color/white"
+            android:textSize="16sp"
+            android:textAllCaps="false"
+            android:background="@drawable/button_primary" />
 
-    <!-- Add Row Button -->
-    <Button
-        android:id="@+id/addRowButton"
-        android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:text="➕ Agregar fila"
-        android:textAllCaps="false"
-        android:textColor="@color/primary_blue"
-        android:backgroundTint="@color/white"
-        android:layout_marginBottom="8dp" />
-
-    <!-- Save Button -->
-    <Button
-        android:id="@+id/saveButton"
-        android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:text="💾 Guardar items"
-        android:textColor="@color/white"
-        android:textSize="16sp"
-        android:textAllCaps="false"
-        android:background="@drawable/button_primary" />
+    </LinearLayout>
 
 </LinearLayout>
