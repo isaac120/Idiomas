@@ -84,7 +84,7 @@ class EditFlexibleListActivity : AppCompatActivity() {
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.header)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(v.paddingLeft, systemBars.top + v.paddingTop, v.paddingRight, v.paddingBottom)
+            v.setPadding(v.paddingLeft, systemBars.top, v.paddingRight, v.paddingBottom)
             insets
         }
 
@@ -169,7 +169,9 @@ class EditFlexibleListActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 var imported = 0
-                val expectedColumns = columnHeaders.size
+                var csvColumnCount = 0
+                var csvHeaders: List<String>? = null
+                val listIsEmpty = items.isEmpty()
 
                 withContext(Dispatchers.IO) {
                     contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -178,24 +180,22 @@ class EditFlexibleListActivity : AppCompatActivity() {
                             var line: String?
 
                             while (reader.readLine().also { line = it } != null) {
-                                // Skip header line if detected
-                                if (isFirstLine) {
-                                    isFirstLine = false
-                                    if (line != null && FileParser.isHeaderLine(line!!.lowercase())) {
-                                        continue
-                                    }
-                                }
-
                                 line?.let { currentLine ->
                                     val parts = currentLine.split(",", ";", "\t").map { it.trim() }
-                                    if (parts.isNotEmpty() && parts.any { it.isNotEmpty() }) {
-                                        // Pad or trim to match expected columns
-                                        val values = if (parts.size >= expectedColumns) {
-                                            parts.take(expectedColumns)
-                                        } else {
-                                            parts + List(expectedColumns - parts.size) { "" }
+                                    
+                                    if (isFirstLine) {
+                                        isFirstLine = false
+                                        csvColumnCount = parts.size
+                                        
+                                        // Check if first line is header
+                                        if (FileParser.isHeaderLine(currentLine.lowercase())) {
+                                            csvHeaders = parts
+                                            return@let // Skip this line as data
                                         }
-                                        database.flexibleDao().addItemToList(listId, values)
+                                    }
+
+                                    // Add as data if valid
+                                    if (parts.isNotEmpty() && parts.any { it.isNotEmpty() }) {
                                         imported++
                                     }
                                 }
@@ -204,15 +204,116 @@ class EditFlexibleListActivity : AppCompatActivity() {
                     }
                 }
 
-                if (imported > 0) {
-                    Toast.makeText(this@EditFlexibleListActivity, "✅ $imported items importados", Toast.LENGTH_SHORT).show()
-                    loadItems()
+                // Determine actual column count from CSV
+                val actualCsvColumns = csvHeaders?.size ?: csvColumnCount
+
+                // Case 1: List is empty - adopt CSV structure
+                if (listIsEmpty && actualCsvColumns >= FlexibleList.MIN_COLUMNS) {
+                    // Update headers from CSV or generate defaults
+                    val newHeaders = csvHeaders ?: (1..actualCsvColumns).map { "Columna $it" }
+                    
+                    withContext(Dispatchers.IO) {
+                        val headersJson = newHeaders.joinToString(",", "[", "]") { "\"${it.replace("\"", "\\\"")}\"" }
+                        database.flexibleDao().updateColumns(listId, newHeaders.size, headersJson)
+                    }
+                    
+                    columnHeaders = newHeaders.toMutableList()
+                    updateHeadersUI()
+                    
+                    // Now import the data
+                    importCSVData(uri, actualCsvColumns)
+                    
+                } else if (!listIsEmpty) {
+                    // Case 2: List has items - validate column count AND header names match
+                    if (actualCsvColumns != columnHeaders.size) {
+                        Toast.makeText(
+                            this@EditFlexibleListActivity,
+                            "❌ El CSV tiene $actualCsvColumns columnas pero la lista tiene ${columnHeaders.size}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        return@launch
+                    }
+                    
+                    // Validate header names match (if CSV has headers)
+                    if (csvHeaders != null) {
+                        val csvHeadersLower = csvHeaders!!.map { it.lowercase().trim() }
+                        val listHeadersLower = columnHeaders.map { it.lowercase().trim() }
+                        
+                        if (csvHeadersLower != listHeadersLower) {
+                            val mismatch = "CSV: ${csvHeaders!!.joinToString(", ")}\nLista: ${columnHeaders.joinToString(", ")}"
+                            AlertDialog.Builder(this@EditFlexibleListActivity)
+                                .setTitle("⚠️ Encabezados diferentes")
+                                .setMessage("Los encabezados del CSV no coinciden con los de la lista:\n\n$mismatch\n\n¿Importar de todos modos?")
+                                .setPositiveButton("Sí, importar") { _, _ ->
+                                    lifecycleScope.launch {
+                                        importCSVData(uri, columnHeaders.size)
+                                    }
+                                }
+                                .setNegativeButton("Cancelar", null)
+                                .show()
+                            return@launch
+                        }
+                    }
+                    
+                    // Import with matching columns
+                    importCSVData(uri, columnHeaders.size)
                 } else {
-                    Toast.makeText(this@EditFlexibleListActivity, "No se encontraron items válidos", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this@EditFlexibleListActivity,
+                        "❌ El CSV debe tener al menos ${FlexibleList.MIN_COLUMNS} columnas",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
+
             } catch (e: Exception) {
                 e.printStackTrace()
                 Toast.makeText(this@EditFlexibleListActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private suspend fun importCSVData(uri: Uri, expectedColumns: Int) {
+        var imported = 0
+        
+        withContext(Dispatchers.IO) {
+            contentResolver.openInputStream(uri)?.use { inputStream ->
+                BufferedReader(InputStreamReader(inputStream)).use { reader ->
+                    var isFirstLine = true
+                    var line: String?
+
+                    while (reader.readLine().also { line = it } != null) {
+                        line?.let { currentLine ->
+                            // Skip header line
+                            if (isFirstLine) {
+                                isFirstLine = false
+                                if (FileParser.isHeaderLine(currentLine.lowercase())) {
+                                    return@let
+                                }
+                            }
+
+                            val parts = currentLine.split(",", ";", "\t").map { it.trim() }
+                            if (parts.isNotEmpty() && parts.any { it.isNotEmpty() }) {
+                                // Pad to match expected columns
+                                val values = if (parts.size >= expectedColumns) {
+                                    parts.take(expectedColumns)
+                                } else {
+                                    parts + List(expectedColumns - parts.size) { "" }
+                                }
+                                database.flexibleDao().addItemToList(listId, values)
+                                imported++
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        withContext(Dispatchers.Main) {
+            if (imported > 0) {
+                Toast.makeText(this@EditFlexibleListActivity, "✅ $imported items importados", Toast.LENGTH_SHORT).show()
+                loadList() // Reload headers and items
+            } else {
+                Toast.makeText(this@EditFlexibleListActivity, "No se encontraron items válidos", Toast.LENGTH_SHORT).show()
             }
         }
     }

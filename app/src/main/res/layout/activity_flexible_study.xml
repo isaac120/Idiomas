@@ -111,6 +111,17 @@
                 android:textColor="@color/text_hint"
                 android:layout_marginTop="4dp" />
 
+            <ImageButton
+                android:id="@+id/speakerButton"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:layout_marginTop="16dp"
+                android:src="@drawable/ic_speaker"
+                android:background="@drawable/input_background"
+                android:contentDescription="Escuchar"
+                android:padding="14dp"
+                app:tint="@color/primary_blue" />
+
         </LinearLayout>
 
     </androidx.cardview.widget.CardView>

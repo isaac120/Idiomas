@@ -38,7 +38,7 @@ class MyListsActivity : AppCompatActivity() {
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.header)) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(v.paddingLeft, systemBars.top + v.paddingTop, v.paddingRight, v.paddingBottom)
+            v.setPadding(v.paddingLeft, systemBars.top, v.paddingRight, v.paddingBottom)
             insets
         }
 

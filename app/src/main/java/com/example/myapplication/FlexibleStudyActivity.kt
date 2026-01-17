@@ -1,8 +1,11 @@
 package com.example.myapplication
 
+import android.media.MediaPlayer
 import android.os.Bundle
+import android.speech.tts.TextToSpeech
 import android.view.View
 import android.widget.Button
+import android.widget.ImageButton
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
@@ -14,6 +17,7 @@ import androidx.core.view.WindowInsetsCompat
 import com.example.myapplication.data.ListItem
 import com.google.android.material.textfield.TextInputEditText
 import org.json.JSONArray
+import java.util.Locale
 
 data class FlexibleQuestion(
     val item: ListItem,
@@ -25,7 +29,7 @@ data class FlexibleQuestion(
     val askedHeader: String
 )
 
-class FlexibleStudyActivity : AppCompatActivity() {
+class FlexibleStudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     companion object {
         var itemsToStudy: MutableList<ListItem> = mutableListOf()
@@ -41,11 +45,19 @@ class FlexibleStudyActivity : AppCompatActivity() {
     private lateinit var answerInput: TextInputEditText
     private lateinit var feedbackText: TextView
     private lateinit var checkButton: Button
+    private lateinit var speakerButton: ImageButton
 
-    private var questions: List<FlexibleQuestion> = emptyList()
-    private var currentIndex = 0
-    private var correctCount = 0
+    private var pendingQuestions: MutableList<FlexibleQuestion> = mutableListOf()
+    private var currentQuestion: FlexibleQuestion? = null
+    private var totalQuestions = 0
+    private var answeredCorrectly = 0
     private var isShowingFeedback = false
+
+    // Audio
+    private var tts: TextToSpeech? = null
+    private var isTtsReady = false
+    private var correctSound: MediaPlayer? = null
+    private var incorrectSound: MediaPlayer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,8 +72,46 @@ class FlexibleStudyActivity : AppCompatActivity() {
         initViews()
         setupWindowInsets()
         setupListeners()
+        setupAudio()
         generateQuestions()
-        showCurrentQuestion()
+        showNextQuestion()
+    }
+
+    private fun setupAudio() {
+        tts = TextToSpeech(this, this)
+        correctSound = MediaPlayer.create(this, R.raw.correct)
+        incorrectSound = MediaPlayer.create(this, R.raw.incorrect)
+    }
+
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            val result = tts?.setLanguage(Locale.US)
+            isTtsReady = result != TextToSpeech.LANG_MISSING_DATA && result != TextToSpeech.LANG_NOT_SUPPORTED
+        }
+    }
+
+    override fun onDestroy() {
+        tts?.stop()
+        tts?.shutdown()
+        correctSound?.release()
+        incorrectSound?.release()
+        super.onDestroy()
+    }
+
+    private fun speakWord(word: String) {
+        if (isTtsReady) {
+            tts?.speak(word, TextToSpeech.QUEUE_FLUSH, null, "word")
+        }
+    }
+
+    private fun playCorrectSound() {
+        correctSound?.seekTo(0)
+        correctSound?.start()
+    }
+
+    private fun playIncorrectSound() {
+        incorrectSound?.seekTo(0)
+        incorrectSound?.start()
     }
 
     private fun setupWindowInsets() {
@@ -82,15 +132,20 @@ class FlexibleStudyActivity : AppCompatActivity() {
         answerInput = findViewById(R.id.answerInput)
         feedbackText = findViewById(R.id.feedbackText)
         checkButton = findViewById(R.id.checkButton)
+        speakerButton = findViewById(R.id.speakerButton)
     }
 
     private fun setupListeners() {
         checkButton.setOnClickListener {
             if (isShowingFeedback) {
-                nextQuestion()
+                showNextQuestion()
             } else {
                 checkAnswer()
             }
+        }
+
+        speakerButton.setOnClickListener {
+            currentQuestion?.let { speakWord(it.givenValue) }
         }
     }
 
@@ -103,47 +158,49 @@ class FlexibleStudyActivity : AppCompatActivity() {
                 val values = JSONArray(item.values)
                 val valuesList = (0 until values.length()).map { values.getString(it) }
                 
-                // Generate 2 questions per item with different column combinations
-                repeat(2) {
-                    val givenIndex = columnIndices.random()
-                    val askedIndex = columnIndices.filter { it != givenIndex }.random()
-                    
-                    val givenValue = valuesList.getOrElse(givenIndex) { "" }
-                    val askedValue = valuesList.getOrElse(askedIndex) { "" }
-                    
-                    if (givenValue.isNotEmpty() && askedValue.isNotEmpty()) {
-                        allQuestions.add(
-                            FlexibleQuestion(
-                                item = item,
-                                givenColumnIndex = givenIndex,
-                                askedColumnIndex = askedIndex,
-                                givenValue = givenValue,
-                                askedValue = askedValue,
-                                givenHeader = columnHeaders.getOrElse(givenIndex) { "Columna ${givenIndex + 1}" },
-                                askedHeader = columnHeaders.getOrElse(askedIndex) { "Columna ${askedIndex + 1}" }
-                            )
+                // Generate 1 question per item with random column combination
+                val givenIndex = columnIndices.random()
+                val askedIndex = columnIndices.filter { it != givenIndex }.random()
+                
+                val givenValue = valuesList.getOrElse(givenIndex) { "" }
+                val askedValue = valuesList.getOrElse(askedIndex) { "" }
+                
+                if (givenValue.isNotEmpty() && askedValue.isNotEmpty()) {
+                    allQuestions.add(
+                        FlexibleQuestion(
+                            item = item,
+                            givenColumnIndex = givenIndex,
+                            askedColumnIndex = askedIndex,
+                            givenValue = givenValue,
+                            askedValue = askedValue,
+                            givenHeader = columnHeaders.getOrElse(givenIndex) { "Columna ${givenIndex + 1}" },
+                            askedHeader = columnHeaders.getOrElse(askedIndex) { "Columna ${askedIndex + 1}" }
                         )
-                    }
+                    )
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
 
-        questions = allQuestions.shuffled()
+        pendingQuestions = allQuestions.shuffled().toMutableList()
+        totalQuestions = pendingQuestions.size
+        answeredCorrectly = 0
     }
 
-    private fun showCurrentQuestion() {
-        if (questions.isEmpty()) {
+    private fun showNextQuestion() {
+        if (pendingQuestions.isEmpty()) {
             showResults()
             return
         }
 
-        val question = questions[currentIndex]
+        currentQuestion = pendingQuestions.removeAt(0)
+        val question = currentQuestion!!
 
-        progressText.text = "Pregunta ${currentIndex + 1} de ${questions.size}"
-        progressBar.progress = ((currentIndex + 1) * 100) / questions.size
-        scoreText.text = "✓ $correctCount"
+        // Progress shows how many have been correctly answered out of total
+        progressText.text = "Pregunta ${answeredCorrectly + 1} de $totalQuestions"
+        progressBar.progress = (answeredCorrectly * 100) / totalQuestions.coerceAtLeast(1)
+        scoreText.text = "✓ $answeredCorrectly"
 
         givenFormText.text = question.givenValue
         givenFormLabel.text = "(${question.givenHeader})"
@@ -160,58 +217,47 @@ class FlexibleStudyActivity : AppCompatActivity() {
     }
 
     private fun checkAnswer() {
-        val question = questions[currentIndex]
+        val question = currentQuestion ?: return
         val userAnswer = answerInput.text.toString().trim().lowercase()
         val correctAnswer = question.askedValue.lowercase()
 
         answerInput.isEnabled = false
 
         if (userAnswer == correctAnswer) {
-            correctCount++
-            scoreText.text = "✓ $correctCount"
+            answeredCorrectly++
+            scoreText.text = "✓ $answeredCorrectly"
+            progressText.text = "Pregunta ${answeredCorrectly + 1} de $totalQuestions"
+            progressBar.progress = (answeredCorrectly * 100) / totalQuestions.coerceAtLeast(1)
             feedbackText.text = "✅ ¡Correcto!"
             feedbackText.setTextColor(ContextCompat.getColor(this, R.color.success_green))
+            playCorrectSound()
         } else {
             feedbackText.text = "❌ ${question.askedValue}"
             feedbackText.setTextColor(ContextCompat.getColor(this, R.color.error_red))
+            playIncorrectSound()
+            
+            // Add question back to end of queue to practice again
+            pendingQuestions.add(question)
         }
 
         feedbackText.visibility = View.VISIBLE
-        checkButton.text = if (currentIndex < questions.size - 1) "Siguiente →" else "Ver resultados"
+        checkButton.text = if (pendingQuestions.isNotEmpty()) "Siguiente →" else "Ver resultados"
         isShowingFeedback = true
     }
 
-    private fun nextQuestion() {
-        currentIndex++
-
-        if (currentIndex >= questions.size) {
-            showResults()
-        } else {
-            showCurrentQuestion()
-        }
-    }
-
     private fun showResults() {
-        val total = questions.size.coerceAtLeast(1)
-        val percentage = (correctCount * 100) / total
-        val emoji = when {
-            percentage >= 90 -> "🏆"
-            percentage >= 70 -> "🎉"
-            percentage >= 50 -> "👍"
-            else -> "📚"
-        }
+        val percentage = if (totalQuestions > 0) 100 else 0
+        val emoji = "🏆"
 
         AlertDialog.Builder(this)
-            .setTitle("$emoji Resultados")
-            .setMessage("Correctos: $correctCount/$total\nPrecisión: $percentage%")
+            .setTitle("$emoji ¡Completado!")
+            .setMessage("Has respondido correctamente las $totalQuestions preguntas.")
             .setPositiveButton("Terminar") { _, _ ->
                 finish()
             }
             .setNeutralButton("Practicar de nuevo") { _, _ ->
-                currentIndex = 0
-                correctCount = 0
                 generateQuestions()
-                showCurrentQuestion()
+                showNextQuestion()
             }
             .setCancelable(false)
             .show()
