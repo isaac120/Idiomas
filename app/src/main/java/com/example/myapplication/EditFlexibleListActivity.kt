@@ -49,12 +49,16 @@ class EditFlexibleListActivity : AppCompatActivity() {
     private lateinit var exportButton: ImageButton
 
     private lateinit var adapter: FlexibleItemAdapter
+    private lateinit var searchInput: android.widget.EditText
+    private lateinit var noResultsText: TextView
     private val database by lazy { AppDatabase.getDatabase(this) }
     
     private var listId: Long = -1
     private var listName: String = ""
     private var columnHeaders: MutableList<String> = mutableListOf()
     private var items: List<ListItem> = emptyList()
+    private var filteredItems: List<ListItem> = emptyList()
+    private var currentSearchQuery: String = ""
 
     // File picker for CSV import
     private val filePickerLauncher = registerForActivityResult(
@@ -109,8 +113,68 @@ class EditFlexibleListActivity : AppCompatActivity() {
         practiceButton = findViewById(R.id.practiceButton)
         fabAddItem = findViewById(R.id.fabAddItem)
         exportButton = findViewById(R.id.exportButton)
+        searchInput = findViewById(R.id.searchInput)
+        noResultsText = findViewById(R.id.noResultsText)
 
         listTitle.text = listName
+        
+        // Setup search listener
+        searchInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) {
+                filterItems(s?.toString() ?: "")
+            }
+        })
+    }
+    
+    private fun filterItems(query: String) {
+        currentSearchQuery = query.trim().lowercase()
+        
+        filteredItems = if (currentSearchQuery.isEmpty()) {
+            items
+        } else {
+            items.filter { item ->
+                try {
+                    val values = JSONArray(item.values)
+                    (0 until values.length()).any { i ->
+                        values.getString(i).lowercase().contains(currentSearchQuery)
+                    }
+                } catch (e: Exception) {
+                    false
+                }
+            }
+        }
+        
+        updateUI()
+    }
+    
+    private fun updateUI() {
+        adapter.updateItems(filteredItems, columnHeaders.size)
+        
+        when {
+            items.isEmpty() -> {
+                emptyState.visibility = android.view.View.VISIBLE
+                noResultsText.visibility = android.view.View.GONE
+                recyclerView.visibility = android.view.View.GONE
+            }
+            filteredItems.isEmpty() && currentSearchQuery.isNotEmpty() -> {
+                emptyState.visibility = android.view.View.GONE
+                noResultsText.visibility = android.view.View.VISIBLE
+                recyclerView.visibility = android.view.View.GONE
+            }
+            else -> {
+                emptyState.visibility = android.view.View.GONE
+                noResultsText.visibility = android.view.View.GONE
+                recyclerView.visibility = android.view.View.VISIBLE
+            }
+        }
+        
+        itemCount.text = if (currentSearchQuery.isEmpty()) {
+            "${items.size} items"
+        } else {
+            "${filteredItems.size} de ${items.size} items"
+        }
     }
 
     private fun setupRecyclerView() {
@@ -345,17 +409,9 @@ class EditFlexibleListActivity : AppCompatActivity() {
             items = withContext(Dispatchers.IO) {
                 database.flexibleDao().getItemsForList(listId)
             }
-
-            adapter.updateItems(items, columnHeaders.size)
-            itemCount.text = "${items.size} items"
-
-            if (items.isEmpty()) {
-                emptyState.visibility = View.VISIBLE
-                recyclerView.visibility = View.GONE
-            } else {
-                emptyState.visibility = View.GONE
-                recyclerView.visibility = View.VISIBLE
-            }
+            
+            // Apply current search filter
+            filterItems(currentSearchQuery)
         }
     }
 
@@ -616,10 +672,37 @@ class EditFlexibleListActivity : AppCompatActivity() {
             return
         }
 
-        FlexibleStudyActivity.itemsToStudy = items.toMutableList()
-        FlexibleStudyActivity.columnHeaders = columnHeaders.toList()
-        startActivity(Intent(this, FlexibleStudyActivity::class.java))
-        overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
+        // Show mode selection dialog
+        val modes = arrayOf(
+            "♾️ Sin límite de tiempo",
+            "💀 2 segundos (Ultra Hard)",
+            "⚡ 5 segundos",
+            "🔥 10 segundos",
+            "🎯 15 segundos",
+            "🐢 20 segundos"
+        )
+        
+        AlertDialog.Builder(this)
+            .setTitle("⏱️ Modo de práctica")
+            .setItems(modes) { _, which ->
+                val timeLimit = when (which) {
+                    1 -> 2000L
+                    2 -> 5000L
+                    3 -> 10000L
+                    4 -> 15000L
+                    5 -> 20000L
+                    else -> 0L
+                }
+                
+                FlexibleStudyActivity.itemsToStudy = items.toMutableList()
+                FlexibleStudyActivity.columnHeaders = columnHeaders.toList()
+                FlexibleStudyActivity.listName = listName
+                FlexibleStudyActivity.timeLimitMs = timeLimit
+                startActivity(Intent(this, FlexibleStudyActivity::class.java))
+                overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     private fun exportList() {

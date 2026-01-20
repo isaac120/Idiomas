@@ -27,6 +27,24 @@ interface StatsDao {
     @Query("SELECT COUNT(*) FROM practice_sessions")
     suspend fun getSessionCount(): Int
 
+    // Get sessions from last 7 days for weekly chart
+    @Query("SELECT * FROM practice_sessions WHERE date >= :startDate ORDER BY date ASC")
+    suspend fun getSessionsSince(startDate: Long): List<PracticeSession>
+
+    // Get stats grouped by list name
+    @Query("""
+        SELECT listName, 
+               SUM(correctCount) as totalCorrect, 
+               SUM(totalCount) as totalAnswered,
+               COUNT(*) as sessionCount
+        FROM practice_sessions 
+        WHERE listName != ''
+        GROUP BY listName 
+        ORDER BY sessionCount DESC
+        LIMIT 10
+    """)
+    suspend fun getStatsByList(): List<ListStats>
+
     // Word Stats
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertWordStats(wordStats: WordStats)
@@ -43,3 +61,13 @@ interface StatsDao {
     @Query("UPDATE word_stats SET correctCount = correctCount + 1, lastSeenDate = :date WHERE word = :word")
     suspend fun incrementCorrect(word: String, date: Long = System.currentTimeMillis())
 }
+
+/**
+ * Data class for list statistics aggregation.
+ */
+data class ListStats(
+    val listName: String,
+    val totalCorrect: Int,
+    val totalAnswered: Int,
+    val sessionCount: Int
+)

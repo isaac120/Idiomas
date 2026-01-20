@@ -14,6 +14,7 @@ class StreakManager(context: Context) {
     companion object {
         private const val PREFS_NAME = "streak_prefs"
         private const val KEY_CURRENT_STREAK = "current_streak"
+        private const val KEY_BEST_STREAK = "best_streak"
         private const val KEY_LAST_PRACTICE_DATE = "last_practice_date"
     }
 
@@ -29,6 +30,13 @@ class StreakManager(context: Context) {
     }
 
     /**
+     * Get the best streak ever achieved.
+     */
+    fun getBestStreak(): Int {
+        return prefs.getInt(KEY_BEST_STREAK, 0)
+    }
+
+    /**
      * Record a practice session. Should be called when user completes a study session.
      * Returns the new streak count.
      */
@@ -36,6 +44,7 @@ class StreakManager(context: Context) {
         val today = getTodayDate()
         val lastPracticeDate = prefs.getString(KEY_LAST_PRACTICE_DATE, null)
         var currentStreak = prefs.getInt(KEY_CURRENT_STREAK, 0)
+        var bestStreak = prefs.getInt(KEY_BEST_STREAK, 0)
 
         when {
             // First time practicing or same day - don't change streak if same day
@@ -56,9 +65,15 @@ class StreakManager(context: Context) {
             }
         }
 
+        // Update best streak if current is higher
+        if (currentStreak > bestStreak) {
+            bestStreak = currentStreak
+        }
+
         // Save updated values
         prefs.edit()
             .putInt(KEY_CURRENT_STREAK, currentStreak)
+            .putInt(KEY_BEST_STREAK, bestStreak)
             .putString(KEY_LAST_PRACTICE_DATE, today)
             .apply()
 

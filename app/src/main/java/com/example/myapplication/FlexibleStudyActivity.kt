@@ -6,6 +6,7 @@ import android.speech.tts.TextToSpeech
 import android.view.View
 import android.widget.Button
 import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
@@ -14,8 +15,16 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
+import com.example.myapplication.data.AppDatabase
 import com.example.myapplication.data.ListItem
+import com.example.myapplication.data.PracticeSession
+import com.example.myapplication.data.StreakManager
+import com.example.myapplication.data.WordStats
 import com.google.android.material.textfield.TextInputEditText
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import java.util.Locale
 
@@ -34,6 +43,8 @@ class FlexibleStudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     companion object {
         var itemsToStudy: MutableList<ListItem> = mutableListOf()
         var columnHeaders: List<String> = emptyList()
+        var listName: String = ""
+        var timeLimitMs: Long = 0 // 0 = no limit
     }
 
     private lateinit var progressText: TextView
@@ -46,11 +57,15 @@ class FlexibleStudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var feedbackText: TextView
     private lateinit var checkButton: Button
     private lateinit var speakerButton: ImageButton
+    private lateinit var timerSection: LinearLayout
+    private lateinit var timerBar: ProgressBar
+    private lateinit var timerText: TextView
 
     private var pendingQuestions: MutableList<FlexibleQuestion> = mutableListOf()
     private var currentQuestion: FlexibleQuestion? = null
     private var totalQuestions = 0
     private var answeredCorrectly = 0
+    private var totalAnswered = 0
     private var isShowingFeedback = false
 
     // Audio
@@ -58,6 +73,14 @@ class FlexibleStudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private var isTtsReady = false
     private var correctSound: MediaPlayer? = null
     private var incorrectSound: MediaPlayer? = null
+
+    // Database & Streak
+    private val database by lazy { AppDatabase.getDatabase(this) }
+    private val streakManager by lazy { StreakManager(this) }
+    
+    // Timer
+    private var countDownTimer: android.os.CountDownTimer? = null
+    private var isTimedMode = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -91,6 +114,7 @@ class FlexibleStudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     override fun onDestroy() {
+        stopTimer()
         tts?.stop()
         tts?.shutdown()
         correctSound?.release()
@@ -133,6 +157,13 @@ class FlexibleStudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         feedbackText = findViewById(R.id.feedbackText)
         checkButton = findViewById(R.id.checkButton)
         speakerButton = findViewById(R.id.speakerButton)
+        timerSection = findViewById(R.id.timerSection)
+        timerBar = findViewById(R.id.timerBar)
+        timerText = findViewById(R.id.timerText)
+        
+        // Setup timed mode if active
+        isTimedMode = timeLimitMs > 0
+        timerSection.visibility = if (isTimedMode) View.VISIBLE else View.GONE
     }
 
     private fun setupListeners() {
@@ -146,6 +177,21 @@ class FlexibleStudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         speakerButton.setOnClickListener {
             currentQuestion?.let { speakWord(it.givenValue) }
+        }
+        
+        // Handle Enter key on keyboard
+        answerInput.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE ||
+                actionId == android.view.inputmethod.EditorInfo.IME_ACTION_GO) {
+                if (isShowingFeedback) {
+                    showNextQuestion()
+                } else {
+                    checkAnswer()
+                }
+                true
+            } else {
+                false
+            }
         }
     }
 
@@ -186,9 +232,13 @@ class FlexibleStudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         pendingQuestions = allQuestions.shuffled().toMutableList()
         totalQuestions = pendingQuestions.size
         answeredCorrectly = 0
+        totalAnswered = 0
     }
 
     private fun showNextQuestion() {
+        // Stop any existing timer
+        stopTimer()
+        
         if (pendingQuestions.isEmpty()) {
             showResults()
             return
@@ -214,14 +264,85 @@ class FlexibleStudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         isShowingFeedback = false
 
         answerInput.requestFocus()
+        
+        // Start timer if in timed mode
+        if (isTimedMode) {
+            startTimer()
+        }
+    }
+    
+    private fun startTimer() {
+        timerBar.progress = 100
+        timerBar.progressTintList = android.content.res.ColorStateList.valueOf(
+            ContextCompat.getColor(this, R.color.primary_blue)
+        )
+        
+        countDownTimer = object : android.os.CountDownTimer(timeLimitMs, 100) {
+            override fun onTick(millisUntilFinished: Long) {
+                val progress = (millisUntilFinished * 100 / timeLimitMs).toInt()
+                timerBar.progress = progress
+                
+                val secondsLeft = (millisUntilFinished / 1000).toInt() + 1
+                timerText.text = "⏱️ ${secondsLeft}s"
+                
+                // Change color when low on time
+                if (secondsLeft <= 3) {
+                    timerBar.progressTintList = android.content.res.ColorStateList.valueOf(
+                        ContextCompat.getColor(this@FlexibleStudyActivity, R.color.error_red)
+                    )
+                    timerText.setTextColor(ContextCompat.getColor(this@FlexibleStudyActivity, R.color.error_red))
+                } else {
+                    timerText.setTextColor(ContextCompat.getColor(this@FlexibleStudyActivity, R.color.text_secondary))
+                }
+            }
+            
+            override fun onFinish() {
+                timerBar.progress = 0
+                timerText.text = "⏱️ 0s"
+                // Time's up! Count as incorrect
+                handleTimeUp()
+            }
+        }.start()
+    }
+    
+    private fun stopTimer() {
+        countDownTimer?.cancel()
+        countDownTimer = null
+    }
+    
+    private fun handleTimeUp() {
+        if (isShowingFeedback) return
+        
+        val question = currentQuestion ?: return
+        
+        answerInput.isEnabled = false
+        totalAnswered++
+        
+        feedbackText.text = "⏱️ ¡Tiempo! → ${question.askedValue}"
+        feedbackText.setTextColor(ContextCompat.getColor(this, R.color.error_red))
+        feedbackText.visibility = View.VISIBLE
+        playIncorrectSound()
+        
+        // Track incorrect answer
+        trackWordResult(question.askedValue, isCorrect = false)
+        
+        // Add question back to queue
+        pendingQuestions.add(question)
+        
+        checkButton.text = if (pendingQuestions.isNotEmpty()) "Siguiente →" else "Ver resultados"
+        isShowingFeedback = true
     }
 
     private fun checkAnswer() {
+        // Stop timer when user submits answer
+        stopTimer()
+        
         val question = currentQuestion ?: return
         val userAnswer = answerInput.text.toString().trim().lowercase()
         val correctAnswer = question.askedValue.lowercase()
 
         answerInput.isEnabled = false
+        totalAnswered++
 
         if (userAnswer == correctAnswer) {
             answeredCorrectly++
@@ -231,10 +352,16 @@ class FlexibleStudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             feedbackText.text = "✅ ¡Correcto!"
             feedbackText.setTextColor(ContextCompat.getColor(this, R.color.success_green))
             playCorrectSound()
+            
+            // Track correct answer
+            trackWordResult(question.askedValue, isCorrect = true)
         } else {
             feedbackText.text = "❌ ${question.askedValue}"
             feedbackText.setTextColor(ContextCompat.getColor(this, R.color.error_red))
             playIncorrectSound()
+            
+            // Track incorrect answer
+            trackWordResult(question.askedValue, isCorrect = false)
             
             // Add question back to end of queue to practice again
             pendingQuestions.add(question)
@@ -245,13 +372,103 @@ class FlexibleStudyActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         isShowingFeedback = true
     }
 
-    private fun showResults() {
-        val percentage = if (totalQuestions > 0) 100 else 0
-        val emoji = "🏆"
+    private fun trackWordResult(word: String, isCorrect: Boolean) {
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) {
+                val statsDao = database.statsDao()
+                
+                // Check if word exists
+                val existingStats = statsDao.getWordStats(word)
+                if (existingStats == null) {
+                    // Create new word stats
+                    statsDao.insertWordStats(
+                        WordStats(
+                            word = word,
+                            incorrectCount = if (isCorrect) 0 else 1,
+                            correctCount = if (isCorrect) 1 else 0
+                        )
+                    )
+                } else {
+                    // Update existing
+                    if (isCorrect) {
+                        statsDao.incrementCorrect(word)
+                    } else {
+                        statsDao.incrementIncorrect(word)
+                    }
+                }
+            }
+        }
+    }
 
+    private fun saveSession() {
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) {
+                database.statsDao().insertSession(
+                    PracticeSession(
+                        correctCount = answeredCorrectly,
+                        totalCount = totalAnswered,
+                        listName = listName
+                    )
+                )
+            }
+        }
+    }
+
+    private fun showResults() {
+        // Save the session and record streak
+        saveSession()
+        val streak = streakManager.recordPractice()
+        
+        // Check for new achievements
+        val achievementManager = com.example.myapplication.data.AchievementManager(this)
+        val newlyUnlocked = mutableListOf<com.example.myapplication.data.Achievement>()
+        
+        // Check streak achievements
+        newlyUnlocked.addAll(achievementManager.checkStreakAchievements(streak))
+        
+        // Check word achievements (get total words from database)
+        lifecycleScope.launch {
+            val totalWords = withContext(Dispatchers.IO) {
+                database.statsDao().getTotalAnswered() ?: 0
+            }
+            newlyUnlocked.addAll(achievementManager.checkWordAchievements(totalWords))
+            
+            // Check perfect session
+            achievementManager.checkPerfectSession(answeredCorrectly, totalAnswered)?.let {
+                newlyUnlocked.add(it)
+            }
+            
+            // Check speed achievement
+            achievementManager.checkSpeedAchievement(timeLimitMs, true)?.let {
+                newlyUnlocked.add(it)
+            }
+            
+            // Check consistent accuracy
+            val totalCorrect = withContext(Dispatchers.IO) {
+                database.statsDao().getTotalCorrect() ?: 0
+            }
+            val overallAccuracy = if (totalWords > 0) (totalCorrect * 100 / totalWords) else 0
+            achievementManager.checkConsistentAccuracy(overallAccuracy)?.let {
+                newlyUnlocked.add(it)
+            }
+            
+            // Show results dialog
+            showResultsDialog(streak, newlyUnlocked)
+        }
+    }
+    
+    private fun showResultsDialog(streak: Int, newlyUnlocked: List<com.example.myapplication.data.Achievement>) {
+        val streakMessage = if (streak > 1) "🔥 Racha: $streak días seguidos" else "🔥 ¡Empezaste tu racha!"
+        
+        val achievementMessage = if (newlyUnlocked.isNotEmpty()) {
+            val badges = newlyUnlocked.joinToString(" ") { it.icon }
+            val names = newlyUnlocked.joinToString(", ") { it.name }
+            "\n\n🏆 ¡Nuevos logros!\n$badges\n$names"
+        } else ""
+        
         AlertDialog.Builder(this)
-            .setTitle("$emoji ¡Completado!")
-            .setMessage("Has respondido correctamente las $totalQuestions preguntas.")
+            .setTitle("🏆 ¡Completado!")
+            .setMessage("Has respondido correctamente las $totalQuestions preguntas.\n\n$streakMessage$achievementMessage")
             .setPositiveButton("Terminar") { _, _ ->
                 finish()
             }

@@ -180,25 +180,40 @@ class MainActivity : AppCompatActivity() {
                 return@launch
             }
 
-            // Build list names with column info
-            val listNames = lists.map { list ->
-                try {
-                    val headers = JSONArray(list.columnHeaders)
-                    val headerNames = (0 until headers.length()).map { headers.getString(it) }
-                    "${list.name} (${headerNames.joinToString(" • ")})"
-                } catch (e: Exception) {
-                    list.name
+            // Get item counts for each list
+            val listInfos = lists.map { list ->
+                val itemCount = withContext(Dispatchers.IO) {
+                    database.flexibleDao().getItemsForList(list.id).size
                 }
-            }.toTypedArray()
+                ListDisplayInfo(list, itemCount)
+            }
 
-            AlertDialog.Builder(this@MainActivity)
-                .setTitle("📚 Selecciona una lista")
-                .setItems(listNames) { _, which ->
-                    startStudyWithFlexibleList(lists[which])
-                }
-                .setNegativeButton("Cancelar", null)
-                .show()
+            showListSelectionDialog(listInfos)
         }
+    }
+
+    private fun showListSelectionDialog(listInfos: List<ListDisplayInfo>) {
+        val dialogView = layoutInflater.inflate(R.layout.dialog_select_list, null)
+        val recyclerView = dialogView.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.listsRecyclerView)
+        val cancelButton = dialogView.findViewById<TextView>(R.id.cancelButton)
+
+        val dialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .create()
+
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        recyclerView.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
+        recyclerView.adapter = ListCardAdapter(listInfos) { selectedList ->
+            dialog.dismiss()
+            startStudyWithFlexibleList(selectedList)
+        }
+
+        cancelButton.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        dialog.show()
     }
 
     private fun startStudyWithFlexibleList(list: FlexibleList) {
@@ -220,11 +235,42 @@ class MainActivity : AppCompatActivity() {
                 (1..list.columnCount).map { "Columna $it" }
             }
 
-            FlexibleStudyActivity.itemsToStudy = items.shuffled().toMutableList()
-            FlexibleStudyActivity.columnHeaders = headers
-            startActivity(Intent(this@MainActivity, FlexibleStudyActivity::class.java))
-            overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
+            // Show mode selection dialog
+            showModeSelectionDialog(items, headers, list.name)
         }
+    }
+    
+    private fun showModeSelectionDialog(items: List<com.example.myapplication.data.ListItem>, headers: List<String>, listName: String) {
+        val modes = arrayOf(
+            "♾️ Sin límite de tiempo",
+            "💀 2 segundos (Ultra Hard)",
+            "⚡ 5 segundos",
+            "🔥 10 segundos",
+            "🎯 15 segundos",
+            "🐢 20 segundos"
+        )
+        
+        AlertDialog.Builder(this)
+            .setTitle("⏱️ Modo de práctica")
+            .setItems(modes) { _, which ->
+                val timeLimit = when (which) {
+                    1 -> 2000L
+                    2 -> 5000L
+                    3 -> 10000L
+                    4 -> 15000L
+                    5 -> 20000L
+                    else -> 0L
+                }
+                
+                FlexibleStudyActivity.itemsToStudy = items.shuffled().toMutableList()
+                FlexibleStudyActivity.columnHeaders = headers
+                FlexibleStudyActivity.listName = listName
+                FlexibleStudyActivity.timeLimitMs = timeLimit
+                startActivity(Intent(this@MainActivity, FlexibleStudyActivity::class.java))
+                overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     private fun toggleDarkMode(enableDark: Boolean) {
